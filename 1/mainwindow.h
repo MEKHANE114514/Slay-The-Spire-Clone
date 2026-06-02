@@ -17,6 +17,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    void showEvent(QShowEvent *event) override;
+
 private:
     Ui::MainWindow *ui;
 };
