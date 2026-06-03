@@ -99,16 +99,33 @@ Minion Player::copySummon(const Minion& original) {
     return m;
 }
 
-Minion Player::moveSummon(Minion&& original) {
+Minion Player::moveSummon(Minion& original) {
     if (isDisabled()) return {};
-    Minion m = moveSummonImpl(std::move(original));
-    addMinion(m);
-    return m;
+
+    // 在 minions 中找到原仆从
+    auto it = std::find_if(minions.begin(), minions.end(),
+        [&original](const Minion& m) { return &m == &original; });
+    if (it == minions.end()) return {};
+
+    // ⚠️ 先保存 onDeath，再移动——std::move 会把 std::function 移空
+    auto deathCallback = std::move(it->onDeath);
+
+    // 移走资源，创建新仆从
+    Minion moved = moveSummonImpl(std::move(*it));
+
+    // 触发原仆从死亡清理（Qt 动画 + 从 vector 移除）
+    if (deathCallback) deathCallback();
+
+    // 新仆从入场
+    addMinion(std::move(moved));
+    return minions.back();
 }
 
 void Player::sacrifice(Minion& m) {
     if (isDisabled()) return;
     sacrificeImpl(m);
+    // 献祭可能直接设置 hp=0，不走 takeDamage，手动触发清理
+    if (!m.isAlive() && m.onDeath) m.onDeath();
 }
 
 bool Player::tryEscape() {
@@ -234,13 +251,6 @@ bool Player::addMinion(Minion m) {
     };
 
     return true;
-}
-
-void Player::removeMinion(int index) {
-    if (index >= 0 && index < static_cast<int>(minions.size())) {
-        minions.erase(minions.begin() + index);
-        if (onMinionRemoved) onMinionRemoved(index);
-    }
 }
 
 // ============================================================

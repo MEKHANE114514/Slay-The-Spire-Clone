@@ -36,7 +36,7 @@ public:
     void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL);
     Minion summon();
     Minion copySummon(const Minion& original);
-    Minion moveSummon(Minion&& original);
+    Minion moveSummon(Minion& original);   // 从场上移除原仆从，转移其资源为新仆从
     void sacrifice(Minion& m);
     bool tryEscape();
 
@@ -107,7 +107,6 @@ public:
 
     // ===== 仆从管理 =====
     bool addMinion(Minion m);       // 加入场上，超过 MAX_MINIONS 返回 false
-    void removeMinion(int index);
 
     // ===== 查询 =====
     bool isAlive() const            { return hp > 0; }
