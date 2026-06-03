@@ -14,6 +14,7 @@ Minion::Minion(std::string n, int h, int a, MinionType t)
 
 void Minion::takeDamage(int dmg, DamageType /*dtype*/) {
     int oldHp = hp;
+    int oldShield = shield;
     // 先扣护盾
     if (shield > 0) {
         int blocked = std::min(shield, dmg);
@@ -22,14 +23,15 @@ void Minion::takeDamage(int dmg, DamageType /*dtype*/) {
     }
     hp -= dmg;
     // 回调
-    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp);
+    if (onShieldChanged && shield != oldShield) onShieldChanged(shield, shield - oldShield);
+    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp, hp - oldHp);
     if (!isAlive() && onDeath)       onDeath();
 }
 
 void Minion::heal(int amount) {
     int oldHp = hp;
     hp = std::min(hp + amount, maxHp);
-    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp);
+    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp, hp - oldHp);
 }
 
 // ============================================================
@@ -39,12 +41,6 @@ void Minion::heal(int amount) {
 void Minion::addStatus(Status s) {
     statuses.push_back(s);
     if (onStatusAdded) onStatusAdded(s);
-
-    // 冻结/眩晕 → 直接改状态
-    if (s.type == StatusType::FREEZE || s.type == StatusType::STUN) {
-        state = (s.type == StatusType::FREEZE) ? EntityState::FROZEN
-                                               : EntityState::STUNNED;
-    }
 }
 
 bool Minion::hasStatus(StatusType t) const {
@@ -77,7 +73,7 @@ void Minion::tickStatuses() {
     statuses.erase(it, statuses.end());
 
     // 回调
-    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp);
+    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp, hp - oldHp);
     if (!isAlive() && onDeath)       onDeath();
 }
 

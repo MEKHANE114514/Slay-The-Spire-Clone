@@ -73,6 +73,7 @@ enum class StatusType {
     VULNERABLE, // 易伤 — 受到的伤害增加
     STRENGTH,   // 力量 — 攻击力提升
     SHIELD,     // 护盾 — 抵消伤害
+    INVINCIBLE, // 无敌 — 不受伤害
     REGEN,      // 再生 — 每回合恢复生命
     MARK,       // 标记 — 被标记的目标受额外伤害
     RAGE,       // 怒气 — 受击后攻击力提升
@@ -90,15 +91,6 @@ enum class Faction {
     CHAOS,
     NATURE,
     VOID
-};
-
-// 玩家/实体状态机（State 模式）
-enum class EntityState {
-    NORMAL,     // 正常
-    STUNNED,    // 眩晕 — 跳过行动
-    FROZEN,     // 冻结 — 跳过行动
-    INVINCIBLE, // 无敌 — 不受伤害
-    DEFENDING   // 防御姿态 — 减伤
 };
 
 // 回合阶段

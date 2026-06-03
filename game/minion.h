@@ -24,7 +24,6 @@ public:
     int shield;
     MinionType type = MinionType::NORMAL;
     std::vector<Status> statuses;
-    EntityState state = EntityState::NORMAL;
 
     Minion() = default;
     Minion(std::string n, int h, int a, MinionType t = MinionType::NORMAL);
@@ -41,7 +40,8 @@ public:
     int getEffectiveAttack() const;
 
     // ---- UI 回调（Qt 绑定）----
-    std::function<void(int hp, int maxHp)> onHpChanged;      // 生命变化 → 受伤闪烁
+    std::function<void(int hp, int maxHp, int delta)> onHpChanged;      // 生命变化 → 受伤闪烁
+    std::function<void(int shield, int delta)>       onShieldChanged;  // 护盾变化
     std::function<void(const Status&)>     onStatusAdded;    // 新增 Buff/Debuff
     std::function<void(StatusType)>        onStatusRemoved;  // Buff/Debuff 消失
     std::function<void()>                  onDeath;          // 死亡 → 消失动画

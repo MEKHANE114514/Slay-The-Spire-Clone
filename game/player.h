@@ -118,7 +118,6 @@ public:
     int hp, maxHp;
     int shield = 0;
     int energy, maxEnergy;
-    EntityState state = EntityState::NORMAL;
     Faction faction = Faction::NONE;
 
     ActionLimits actions;
@@ -130,11 +129,10 @@ public:
     std::function<void(int)>             onMinionAdded;       // 仆从登场（index）
     std::function<void(int)>             onMinionRemoved;      // 仆从退场（index）
     // 属性变化
-    std::function<void(int hp, int maxHp)> onHpChanged;    // 生命变化
-    std::function<void(int shield)>       onShieldChanged; // 护盾变化
-    std::function<void(int energy, int maxEnergy)> onEnergyChanged; // 能量变化
+    std::function<void(int hp, int maxHp, int delta)> onHpChanged;    // 生命变化（delta：正=回血，负=扣血）
+    std::function<void(int shield, int delta)>  onShieldChanged; // 护盾变化（delta：正=获得，负=消耗）
+    std::function<void(int energy, int maxEnergy, int delta)> onEnergyChanged; // 能量变化（delta：正=获得，负=消耗）
     // 状态
-    std::function<void(EntityState)>      onStateChanged;   // 玩家状态切换
     std::function<void(const Status&)>    onStatusAdded;    // 新增 Buff/Debuff
     std::function<void(StatusType)>       onStatusRemoved;  // Buff/Debuff 消失
     // 数值飘字

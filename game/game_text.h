@@ -20,6 +20,7 @@ inline std::string statusName(StatusType s) {
         case StatusType::VULNERABLE: return "易伤";
         case StatusType::STRENGTH:   return "力量";
         case StatusType::SHIELD:     return "护盾";
+        case StatusType::INVINCIBLE: return "无敌";
         case StatusType::REGEN:      return "再生";
         case StatusType::MARK:       return "标记";
         case StatusType::RAGE:       return "怒气";
@@ -81,17 +82,6 @@ inline std::string functionTargetName(FunctionTarget f) {
     }
 }
 
-// ---- 实体状态 ----
-inline std::string entityStateName(EntityState s) {
-    switch (s) {
-        case EntityState::NORMAL:      return "正常";
-        case EntityState::STUNNED:     return "眩晕";
-        case EntityState::FROZEN:      return "冻结";
-        case EntityState::INVINCIBLE:  return "无敌";
-        case EntityState::DEFENDING:   return "防御姿态";
-        default:                       return "未知";
-    }
-}
 
 // ---- 阵营 ----
 inline std::string factionName(Faction f) {
