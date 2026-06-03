@@ -2,7 +2,6 @@
 #include "enemy.h"       // initDefaultFunctions 中调用 target.takeDamage()
 #include <algorithm>     // std::min, std::remove_if, std::any_of
 #include <cstdlib>       // rand
-#include <ctime>         // time（后续在别处初始化随机种子）
 
 Player::Player(std::string playerName, int maxHp, int maxEnergy)
     : name(std::move(playerName))
@@ -99,16 +98,33 @@ Minion Player::copySummon(const Minion& original) {
     return m;
 }
 
-Minion Player::moveSummon(Minion&& original) {
+Minion Player::moveSummon(Minion& original) {
     if (isDisabled()) return {};
-    Minion m = moveSummonImpl(std::move(original));
-    addMinion(m);
-    return m;
+
+    // 在 minions 中找到原仆从
+    auto it = std::find_if(minions.begin(), minions.end(),
+        [&original](const Minion& m) { return &m == &original; });
+    if (it == minions.end()) return {};
+
+    // ⚠️ 先保存 onDeath，再移动——std::move 会把 std::function 移空
+    auto deathCallback = std::move(it->onDeath);
+
+    // 移走资源，创建新仆从
+    Minion moved = moveSummonImpl(std::move(*it));
+
+    // 触发原仆从死亡清理（Qt 动画 + 从 vector 移除）
+    if (deathCallback) deathCallback();
+
+    // 新仆从入场
+    addMinion(std::move(moved));
+    return minions.back();
 }
 
 void Player::sacrifice(Minion& m) {
     if (isDisabled()) return;
     sacrificeImpl(m);
+    // 献祭可能直接设置 hp=0，不走 takeDamage，手动触发清理
+    if (!m.isAlive() && m.onDeath) m.onDeath();
 }
 
 bool Player::tryEscape() {
@@ -216,15 +232,24 @@ void Player::resetActionLimits() {
 bool Player::addMinion(Minion m) {
     if (minions.size() >= MAX_MINIONS) return false;
     minions.push_back(std::move(m));
-    if (onMinionAdded) onMinionAdded(static_cast<int>(minions.size()) - 1);
-    return true;
-}
+    Minion* ptr = &minions.back();
+    int index = static_cast<int>(minions.size()) - 1;
 
-void Player::removeMinion(int index) {
-    if (index >= 0 && index < static_cast<int>(minions.size())) {
-        minions.erase(minions.begin() + index);
-        if (onMinionRemoved) onMinionRemoved(index);
-    }
+    // ① 先让 Qt 绑定自己的 onDeath（动画）
+    if (onMinionAdded) onMinionAdded(index);
+
+    // ② 包装 onDeath：先 Qt 动画 → 再通知移除 → 从 vector 清除
+    auto oldOnDeath = std::move(ptr->onDeath);
+    ptr->onDeath = [this, ptr, oldDeath = std::move(oldOnDeath)]() {
+        if (oldDeath) oldDeath();           // Qt 死亡动画
+        auto it = std::find_if(minions.begin(), minions.end(),
+            [ptr](const Minion& m) { return &m == ptr; });
+        if (it != minions.end()) {
+            minions.erase(it);
+        }
+    };
+
+    return true;
 }
 
 // ============================================================

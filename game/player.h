@@ -36,7 +36,7 @@ public:
     void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL);
     Minion summon();
     Minion copySummon(const Minion& original);
-    Minion moveSummon(Minion&& original);
+    Minion moveSummon(Minion& original);   // 从场上移除原仆从，转移其资源为新仆从
     void sacrifice(Minion& m);
     bool tryEscape();
 
@@ -107,7 +107,6 @@ public:
 
     // ===== 仆从管理 =====
     bool addMinion(Minion m);       // 加入场上，超过 MAX_MINIONS 返回 false
-    void removeMinion(int index);
 
     // ===== 查询 =====
     bool isAlive() const            { return hp > 0; }
@@ -127,7 +126,6 @@ public:
     // ---- UI 回调（Qt 绑定，纯 C++ 接口，游戏逻辑不依赖 Qt）----
     // 仆从
     std::function<void(int)>             onMinionAdded;       // 仆从登场（index）
-    std::function<void(int)>             onMinionRemoved;      // 仆从退场（index）
     // 属性变化
     std::function<void(int hp, int maxHp, int delta)> onHpChanged;    // 生命变化（delta：正=回血，负=扣血）
     std::function<void(int shield, int delta)>  onShieldChanged; // 护盾变化（delta：正=获得，负=消耗）

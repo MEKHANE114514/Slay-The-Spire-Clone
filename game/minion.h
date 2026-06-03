@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 #include "types.h"
 
 // ============================================================
@@ -29,6 +30,9 @@ public:
     Minion(std::string n, int h, int a, MinionType t = MinionType::NORMAL);
 
     bool isAlive() const { return hp > 0; }
+    bool isDisabled() const {
+        return hasStatus(StatusType::FREEZE) || hasStatus(StatusType::STUN);
+    }
 
     void takeDamage(int dmg, DamageType dtype = DamageType::PHYSICAL);
     void heal(int amount);
