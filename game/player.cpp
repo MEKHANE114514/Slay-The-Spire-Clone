@@ -2,7 +2,6 @@
 #include "enemy.h"       // initDefaultFunctions 中调用 target.takeDamage()
 #include <algorithm>     // std::min, std::remove_if, std::any_of
 #include <cstdlib>       // rand
-#include <ctime>         // time（后续在别处初始化随机种子）
 
 Player::Player(std::string playerName, int maxHp, int maxEnergy)
     : name(std::move(playerName))
