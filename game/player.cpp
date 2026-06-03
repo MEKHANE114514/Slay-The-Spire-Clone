@@ -216,7 +216,23 @@ void Player::resetActionLimits() {
 bool Player::addMinion(Minion m) {
     if (minions.size() >= MAX_MINIONS) return false;
     minions.push_back(std::move(m));
-    if (onMinionAdded) onMinionAdded(static_cast<int>(minions.size()) - 1);
+    Minion* ptr = &minions.back();
+    int index = static_cast<int>(minions.size()) - 1;
+
+    // ① 先让 Qt 绑定自己的 onDeath（动画）
+    if (onMinionAdded) onMinionAdded(index);
+
+    // ② 包装 onDeath：先 Qt 动画 → 再通知移除 → 从 vector 清除
+    auto oldOnDeath = std::move(ptr->onDeath);
+    ptr->onDeath = [this, ptr, oldDeath = std::move(oldOnDeath)]() {
+        if (oldDeath) oldDeath();           // Qt 死亡动画
+        auto it = std::find_if(minions.begin(), minions.end(),
+            [ptr](const Minion& m) { return &m == ptr; });
+        if (it != minions.end()) {
+            minions.erase(it);
+        }
+    };
+
     return true;
 }
 

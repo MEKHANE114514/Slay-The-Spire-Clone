@@ -127,7 +127,6 @@ public:
     // ---- UI 回调（Qt 绑定，纯 C++ 接口，游戏逻辑不依赖 Qt）----
     // 仆从
     std::function<void(int)>             onMinionAdded;       // 仆从登场（index）
-    std::function<void(int)>             onMinionRemoved;      // 仆从退场（index）
     // 属性变化
     std::function<void(int hp, int maxHp, int delta)> onHpChanged;    // 生命变化（delta：正=回血，负=扣血）
     std::function<void(int shield, int delta)>  onShieldChanged; // 护盾变化（delta：正=获得，负=消耗）
