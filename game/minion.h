@@ -39,6 +39,12 @@ public:
 
     // 考虑状态加成后的实际攻击力
     int getEffectiveAttack() const;
+
+    // ---- UI 回调（Qt 绑定）----
+    std::function<void(int hp, int maxHp)> onHpChanged;      // 生命变化 → 受伤闪烁
+    std::function<void(const Status&)>     onStatusAdded;    // 新增 Buff/Debuff
+    std::function<void(StatusType)>        onStatusRemoved;  // Buff/Debuff 消失
+    std::function<void()>                  onDeath;          // 死亡 → 消失动画
 };
 
 #endif // MINION_H

@@ -18,9 +18,9 @@ Player::Player(std::string playerName, int maxHp, int maxEnergy)
 // ============================================================
 void Player::initDefaultFunctions()
 {
-    // ---- 默认攻击：造成 10 点物理伤害 ----
+    // ---- 默认攻击：造成基础攻击力的伤害 ----
     attackImpl = [this](Enemy& target) {
-        target.takeDamage(10, DamageType::PHYSICAL);
+        target.takeDamage(getEffectiveAttack(), DamageType::PHYSICAL);
     };
 
     // ---- 默认受击：先扣护盾，再扣生命 ----
@@ -59,4 +59,205 @@ void Player::initDefaultFunctions()
     escapeImpl = [this]() -> bool {
         return (rand() % 100) < 50;
     };
+}
+
+// ============================================================
+// 第 2 组：7 个对外转发函数
+// 主动行动：检查 isDisabled()（眩晕/冻结拦截）
+// 被动响应：检查 INVINCIBLE（无敌拦截）
+// summon / copySummon / moveSummon：自动 addMinion 入场
+// 所有转发函数在值变化后触发 UI 回调
+// ============================================================
+
+void Player::attack(Enemy& target) {
+    if (isDisabled()) return;
+    attackImpl(target);
+}
+
+void Player::takeDamage(int dmg, DamageType type) {
+    if (state == EntityState::INVINCIBLE) return;
+    int oldHp = hp;
+    int oldShield = shield;
+    takeDamageImpl(dmg, type);
+    // 通知 Qt：生命/护盾变化 + 受击飘字
+    if (onDamageReceived && hp < oldHp) onDamageReceived(oldHp - hp, type);
+    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp);
+    if (onShieldChanged && shield != oldShield) onShieldChanged(shield);
+}
+
+Minion Player::summon() {
+    if (isDisabled()) return {};
+    Minion m = summonImpl();
+    addMinion(m);
+    return m;
+}
+
+Minion Player::copySummon(const Minion& original) {
+    if (isDisabled()) return {};
+    Minion m = copySummonImpl(original);
+    addMinion(m);
+    return m;
+}
+
+Minion Player::moveSummon(Minion&& original) {
+    if (isDisabled()) return {};
+    Minion m = moveSummonImpl(std::move(original));
+    addMinion(m);
+    return m;
+}
+
+void Player::sacrifice(Minion& m) {
+    if (isDisabled()) return;
+    sacrificeImpl(m);
+}
+
+bool Player::tryEscape() {
+    if (isDisabled()) return false;
+    return escapeImpl();
+}
+
+// ============================================================
+// 第 3 组：基础动作（受 ActionLimits 限制）
+// ============================================================
+
+void Player::basicAttack(Enemy& target) {
+    if (!canBasicAttack()) return;
+    actions.attacks--;
+    attack(target);
+}
+
+void Player::basicDefend() {
+    if (!canBasicDefend()) return;
+    actions.defends--;
+    EntityState old = state;
+    state = EntityState::DEFENDING;
+    if (onStateChanged && old != state) onStateChanged(state);
+}
+
+void Player::basicSummon() {
+    if (!canBasicSummon()) return;
+    actions.summons--;
+    summon();  // 转发函数已处理 addMinion + 回调
+}
+
+// ============================================================
+// 第 4 组：状态管理
+// ============================================================
+
+void Player::heal(int amount) {
+    int oldHp = hp;
+    hp = std::min(hp + amount, maxHp);
+    int healed = hp - oldHp;
+    if (onHealed && healed > 0) onHealed(healed);
+    if (onHpChanged && healed > 0) onHpChanged(hp, maxHp);
+}
+
+void Player::addShield(int amount) {
+    shield += amount;
+    if (onShieldChanged) onShieldChanged(shield);
+}
+
+void Player::addStatus(Status s) {
+    // 同类型状态是否叠加由具体卡牌逻辑控制，这里只负责存储
+    statuses.push_back(s);
+    if (onStatusAdded) onStatusAdded(s);
+
+    // 冻结/眩晕直接修改实体状态
+    if (s.type == StatusType::FREEZE || s.type == StatusType::STUN) {
+        EntityState old = state;
+        state = (s.type == StatusType::FREEZE) ? EntityState::FROZEN
+                                               : EntityState::STUNNED;
+        if (onStateChanged && old != state) onStateChanged(state);
+    }
+}
+
+void Player::removeStatus(StatusType type) {
+    auto it = std::remove_if(statuses.begin(), statuses.end(),
+        [type](const Status& s) { return s.type == type; });
+    if (it != statuses.end()) {
+        if (onStatusRemoved) onStatusRemoved(type);
+    }
+    statuses.erase(it, statuses.end());
+
+    // 如果移除的是冻结/眩晕，恢复为 NORMAL
+    if ((type == StatusType::FREEZE || type == StatusType::STUN)
+        && !hasStatus(StatusType::FREEZE) && !hasStatus(StatusType::STUN)) {
+        EntityState old = state;
+        state = EntityState::NORMAL;
+        if (onStateChanged && old != state) onStateChanged(state);
+    }
+}
+
+bool Player::hasStatus(StatusType type) const {
+    return std::any_of(statuses.begin(), statuses.end(),
+        [type](const Status& s) { return s.type == type; });
+}
+
+void Player::tickStatuses() {
+    int oldHp = hp;
+
+    for (auto& s : statuses) {
+        switch (s.type) {
+            case StatusType::BURN:    hp -= s.value;            break;
+            case StatusType::POISON:  hp -= s.value; s.value++; break;
+            case StatusType::REGEN:   heal(s.value);            break;
+            case StatusType::SHIELD:  /* 护盾不自动消失 */      break;
+            // 其他状态仅倒计时，不触发每回合效果
+            default: break;
+        }
+        if (s.turnsRemaining > 0) s.turnsRemaining--;
+    }
+
+    // 清除到期状态（到期前通知 Qt）
+    auto it = std::remove_if(statuses.begin(), statuses.end(),
+        [this](const Status& s) {
+            if (s.turnsRemaining == 0 && s.type != StatusType::SHIELD) {
+                if (onStatusRemoved) onStatusRemoved(s.type);
+                return true;
+            }
+            return false;
+        });
+    statuses.erase(it, statuses.end());
+
+    // 生命变化通知
+    if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp);
+}
+
+void Player::resetActionLimits() {
+    actions = ActionLimits{};
+}
+
+// ============================================================
+// 第 5 组：仆从管理
+// ============================================================
+
+bool Player::addMinion(Minion m) {
+    if (minions.size() >= MAX_MINIONS) return false;
+    minions.push_back(std::move(m));
+    if (onMinionAdded) onMinionAdded(static_cast<int>(minions.size()) - 1);
+    return true;
+}
+
+void Player::removeMinion(int index) {
+    if (index >= 0 && index < static_cast<int>(minions.size())) {
+        minions.erase(minions.begin() + index);
+        if (onMinionRemoved) onMinionRemoved(index);
+    }
+}
+
+// ============================================================
+// 第 6 组：查询
+// ============================================================
+
+bool Player::isDisabled() const {
+    return state == EntityState::STUNNED || state == EntityState::FROZEN;
+}
+
+int Player::getEffectiveAttack() const {
+    int atk = baseAttack;
+    for (auto& s : statuses) {
+        if (s.type == StatusType::STRENGTH) atk += s.value;
+        if (s.type == StatusType::WEAKEN)   atk -= s.value;
+    }
+    return atk > 0 ? atk : 0;
 }

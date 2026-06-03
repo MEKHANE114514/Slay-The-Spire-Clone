@@ -41,13 +41,34 @@ public:
     bool tryEscape();
 
     // ===== 函数牌 setter（替换 *_Impl 实现）=====
-    void setAttackFunc(AttackFunc f)      { attackImpl = std::move(f); }
-    void setTakeDamageFunc(TakeDamageFunc f) { takeDamageImpl = std::move(f); }
-    void setSummonFunc(SummonFunc f)      { summonImpl = std::move(f); }
-    void setCopySummonFunc(CopySummonFunc f) { copySummonImpl = std::move(f); }
-    void setMoveSummonFunc(MoveSummonFunc f) { moveSummonImpl = std::move(f); }
-    void setSacrificeFunc(SacrificeFunc f)   { sacrificeImpl = std::move(f); }
-    void setEscapeFunc(EscapeFunc f)      { escapeImpl = std::move(f); }
+    void setAttackFunc(AttackFunc f) {
+        attackImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::ATTACK);
+    }
+    void setTakeDamageFunc(TakeDamageFunc f) {
+        takeDamageImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::TAKE_DAMAGE);
+    }
+    void setSummonFunc(SummonFunc f) {
+        summonImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::SUMMON);
+    }
+    void setCopySummonFunc(CopySummonFunc f) {
+        copySummonImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::COPY_SUMMON);
+    }
+    void setMoveSummonFunc(MoveSummonFunc f) {
+        moveSummonImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::MOVE_SUMMON);
+    }
+    void setSacrificeFunc(SacrificeFunc f) {
+        sacrificeImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::SACRIFICE);
+    }
+    void setEscapeFunc(EscapeFunc f) {
+        escapeImpl = std::move(f);
+        if (onFunctionModified) onFunctionModified(FunctionTarget::ESCAPE);
+    }
 
     // getter（用于函数牌叠加：取旧函数 + 包装新逻辑）
     AttackFunc     getAttackFunc() const      { return attackImpl; }
@@ -80,6 +101,10 @@ public:
     void tickStatuses();            // 回合结束：倒计时、灼烧扣血……
     void resetActionLimits();       // 新回合重置次数
 
+    // ===== 攻击力计算 =====
+    int baseAttack = 10;            // 基础攻击力
+    int getEffectiveAttack() const; // 考虑状态加成后的实际攻击力
+
     // ===== 仆从管理 =====
     bool addMinion(Minion m);       // 加入场上，超过 MAX_MINIONS 返回 false
     void removeMinion(int index);
@@ -99,6 +124,24 @@ public:
     ActionLimits actions;
     std::vector<Status> statuses;
     std::vector<Minion> minions;
+
+    // ---- UI 回调（Qt 绑定，纯 C++ 接口，游戏逻辑不依赖 Qt）----
+    // 仆从
+    std::function<void(int)>             onMinionAdded;       // 仆从登场（index）
+    std::function<void(int)>             onMinionRemoved;      // 仆从退场（index）
+    // 属性变化
+    std::function<void(int hp, int maxHp)> onHpChanged;    // 生命变化
+    std::function<void(int shield)>       onShieldChanged; // 护盾变化
+    std::function<void(int energy, int maxEnergy)> onEnergyChanged; // 能量变化
+    // 状态
+    std::function<void(EntityState)>      onStateChanged;   // 玩家状态切换
+    std::function<void(const Status&)>    onStatusAdded;    // 新增 Buff/Debuff
+    std::function<void(StatusType)>       onStatusRemoved;  // Buff/Debuff 消失
+    // 数值飘字
+    std::function<void(int amount)>       onHealed;         // 回血飘字
+    std::function<void(int dmg, DamageType)> onDamageReceived; // 受击飘字
+    // 函数牌
+    std::function<void(FunctionTarget)>   onFunctionModified; // 函数牌替换时播放特效
 
 private:
     // ===== 7 个可被函数牌替换的核心实现 =====
