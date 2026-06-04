@@ -1,11 +1,12 @@
 #include "game_manager.h"
 #include <cstdlib>   // rand, srand
 #include <ctime>     // time
+#include <algorithm> // shuffle, remove_if
 
 GameManager::GameManager()
     : battle(player)
 {
-    srand(static_cast<unsigned>(time(nullptr)));  // 初始化随机种子
+    srand(static_cast<unsigned>(time(nullptr)));
 }
 
 // ============================================================
@@ -15,24 +16,30 @@ GameManager::GameManager()
 void GameManager::startTurn() {
     turnNumber++;
     player.resetActionLimits();
-    growMaxEnergy();                   // 随回合增大能量上限
+    growMaxEnergy();
     restoreEnergy();
+    drawCards(DEFAULT_DRAW_PER_TURN);
     if (battle.onTurnStart) battle.onTurnStart(turnNumber);
 }
 
-void GameManager::endTurn() {
-    // ATTACK 阶段：仆从攻击 + 敌人行动
-    battle.executeAttackPhase();
-    if (isBattleOver()) { finishBattle(); return; }
+TurnResult GameManager::endTurn() {
+    discardHand();
 
-    // END 阶段：全场状态结算
+    battle.executeAttackPhase();
+    if (isBattleOver()) { finishBattle(isPlayerWin()); return {true, isPlayerWin()}; }
+
     battle.executeEndPhase();
-    if (isBattleOver()) { finishBattle(); return; }
+    if (isBattleOver()) { finishBattle(isPlayerWin()); return {true, isPlayerWin()}; }
 
     if (battle.onTurnEnd) battle.onTurnEnd(turnNumber);
 
-    // 下一回合
     startTurn();
+    return {false, false};
+}
+
+void GameManager::drawCards(int count) {
+    for (int i = 0; i < count; ++i)
+        drawOneCard();  // 回调在 drawOneCard 内部触发
 }
 
 // ============================================================
@@ -40,7 +47,6 @@ void GameManager::endTurn() {
 // ============================================================
 
 void GameManager::growMaxEnergy() {
-    // 起始 = DEFAULT_MAX_ENERGY，之后每回合 +1
     player.maxEnergy = DEFAULT_MAX_ENERGY + turnNumber - 1;
 }
 
@@ -61,19 +67,111 @@ void GameManager::spendEnergy(int cost) {
 }
 
 // ============================================================
+// 牌组操作
+// ============================================================
+
+DrawResult GameManager::drawOneCard() {
+    if (hand.size() >= MAX_HAND_SIZE)
+        return {false, false, -1, {}};
+
+    // 牌堆空但弃牌堆有牌 → 通知 Qt 先播洗牌动画
+    if (drawPile.empty() && !discardPile.empty())
+        return {false, true, -1, {}};
+
+    // 牌堆空且弃牌堆也空 → 没牌可抽
+    if (drawPile.empty())
+        return {false, false, -1, {}};
+
+    // 随机抽一张
+    int idx = rand() % drawPile.size();
+    std::unique_ptr<Card> card = std::move(drawPile[idx]);
+    drawPile.erase(drawPile.begin() + idx);
+
+    CardView view{card->name, card->description, card->cost, card->targetMode};
+    int handIndex = static_cast<int>(hand.size());
+    hand.push_back(std::move(card));
+
+    if (onCardDrawn) onCardDrawn(handIndex, view);
+    return {true, false, handIndex, view};
+}
+
+void GameManager::recycleDiscardToDrawPile() {
+    for (auto& card : discardPile)
+        drawPile.push_back(std::move(card));
+    discardPile.clear();
+
+    // 洗牌
+    std::random_shuffle(drawPile.begin(), drawPile.end());
+
+    if (onCardsRecycled) onCardsRecycled();
+}
+
+PlayResult GameManager::playCard(int handIndex, Enemy* target) {
+    if (handIndex < 0 || handIndex >= static_cast<int>(hand.size()))
+        return {false, handIndex, {}, "手牌不存在"};
+
+    Card* card = hand[handIndex].get();
+    if (!card) return {false, handIndex, {}, "手牌不存在"};
+
+    if (!card->canPlay(player))
+        return {false, handIndex, {}, "当前无法打出此牌"};
+
+    if (player.energy < card->cost)
+        return {false, handIndex, {}, "能量不足"};
+
+    // 扣能量 + 执行卡牌
+    spendEnergy(card->cost);
+    card->play(player, target);
+
+    // 移到弃牌堆
+    CardView view{card->name, card->description, card->cost, card->targetMode};
+    discardPile.push_back(std::move(hand[handIndex]));
+    hand.erase(hand.begin() + handIndex);
+
+    return {true, handIndex, view, ""};
+}
+
+void GameManager::discardHand() {
+    for (auto& card : hand)
+        discardPile.push_back(std::move(card));
+    hand.clear();
+}
+
+// ============================================================
+// 查询（Qt 只读）
+// ============================================================
+
+std::vector<CardView> GameManager::getHandView() const {
+    std::vector<CardView> result;
+    for (auto& card : hand) {
+        if (card)
+            result.push_back({card->name, card->description, card->cost, card->targetMode});
+        else
+            result.push_back({});
+    }
+    return result;
+}
+
+std::string GameManager::getEnemyIntentText() const {
+    std::string text;
+    for (auto& e : battle.enemies) {
+        if (!text.empty()) text += "\n";
+        text += e->name + "：" + e->nextIntent.name();
+        if (e->nextIntent.value > 0)
+            text += " " + std::to_string(e->nextIntent.value);
+    }
+    return text.empty() ? "无敌人" : text;
+}
+
+// ============================================================
 // 战斗
 // ============================================================
 
 void GameManager::startBattle() {
-    // 以后在此创建具体怪物并调用 battle.addEnemy(...)
     if (onGameStart) onGameStart();
     startTurn();
 }
 
-// ============================================================
-// 内部
-// ============================================================
-
-void GameManager::finishBattle() {
+void GameManager::finishBattle(bool playerWin) {
     if (onGameEnd) onGameEnd();
 }
