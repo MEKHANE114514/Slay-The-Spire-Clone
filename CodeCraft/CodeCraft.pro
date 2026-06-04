@@ -11,7 +11,14 @@ SOURCES += \
     mainwindow.cpp
 
 HEADERS += \
-    mainwindow.h
+    mainwindow.h \
+    game_manager.h \
+    battle.h \
+    enemy.h \
+    game_text.h \
+    minion.h \
+    player.h \
+    types.h
 
 FORMS += \
     mainwindow.ui

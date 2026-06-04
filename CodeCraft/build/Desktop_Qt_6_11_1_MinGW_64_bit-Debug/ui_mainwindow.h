@@ -28,7 +28,7 @@ public:
     QLabel *titleLabel;
     QLabel *playerHpLabel;
     QLabel *playerEnergyLabel;
-    QLabel *playerArmorLabel;
+    QLabel *playerShieldLabel;
     QLabel *enemyHpLabel;
     QLabel *enemyIntentLabel;
     QPushButton *cardButton1;
@@ -40,6 +40,8 @@ public:
     QPushButton *endTurnButton;
     QPushButton *restartButton;
     QPushButton *helpButton;
+    QLabel *drawPileLabel;
+    QLabel *discardPileLabel;
     QMenuBar *menubar;
     QStatusBar *statusbar;
 
@@ -52,7 +54,7 @@ public:
         centralwidget->setObjectName("centralwidget");
         titleLabel = new QLabel(centralwidget);
         titleLabel->setObjectName("titleLabel");
-        titleLabel->setGeometry(QRect(250, 30, 91, 16));
+        titleLabel->setGeometry(QRect(250, 30, 121, 41));
         QFont font;
         font.setPointSize(18);
         font.setBold(true);
@@ -63,9 +65,9 @@ public:
         playerEnergyLabel = new QLabel(centralwidget);
         playerEnergyLabel->setObjectName("playerEnergyLabel");
         playerEnergyLabel->setGeometry(QRect(40, 66, 101, 20));
-        playerArmorLabel = new QLabel(centralwidget);
-        playerArmorLabel->setObjectName("playerArmorLabel");
-        playerArmorLabel->setGeometry(QRect(40, 96, 111, 20));
+        playerShieldLabel = new QLabel(centralwidget);
+        playerShieldLabel->setObjectName("playerShieldLabel");
+        playerShieldLabel->setGeometry(QRect(40, 96, 111, 20));
         enemyHpLabel = new QLabel(centralwidget);
         enemyHpLabel->setObjectName("enemyHpLabel");
         enemyHpLabel->setGeometry(QRect(460, 50, 101, 21));
@@ -89,17 +91,23 @@ public:
         cardButton5->setGeometry(QRect(490, 120, 71, 41));
         logTextEdit = new QTextEdit(centralwidget);
         logTextEdit->setObjectName("logTextEdit");
-        logTextEdit->setGeometry(QRect(240, 180, 101, 41));
+        logTextEdit->setGeometry(QRect(610, 80, 201, 221));
         logTextEdit->setReadOnly(true);
         endTurnButton = new QPushButton(centralwidget);
         endTurnButton->setObjectName("endTurnButton");
-        endTurnButton->setGeometry(QRect(30, 270, 61, 31));
+        endTurnButton->setGeometry(QRect(660, 10, 61, 31));
         restartButton = new QPushButton(centralwidget);
         restartButton->setObjectName("restartButton");
-        restartButton->setGeometry(QRect(260, 270, 61, 31));
+        restartButton->setGeometry(QRect(740, 10, 61, 31));
         helpButton = new QPushButton(centralwidget);
         helpButton->setObjectName("helpButton");
-        helpButton->setGeometry(QRect(440, 267, 61, 31));
+        helpButton->setGeometry(QRect(820, 10, 61, 31));
+        drawPileLabel = new QLabel(centralwidget);
+        drawPileLabel->setObjectName("drawPileLabel");
+        drawPileLabel->setGeometry(QRect(50, 250, 40, 51));
+        discardPileLabel = new QLabel(centralwidget);
+        discardPileLabel->setObjectName("discardPileLabel");
+        discardPileLabel->setGeometry(QRect(490, 250, 40, 51));
         MainWindow->setCentralWidget(centralwidget);
         menubar = new QMenuBar(MainWindow);
         menubar->setObjectName("menubar");
@@ -120,7 +128,7 @@ public:
         titleLabel->setText(QCoreApplication::translate("MainWindow", "CodeCraft", nullptr));
         playerHpLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\347\224\237\345\221\275\357\274\23250/50", nullptr));
         playerEnergyLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\350\203\275\351\207\217\357\274\2323", nullptr));
-        playerArmorLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\346\212\244\347\224\262\357\274\2320", nullptr));
+        playerShieldLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\346\212\244\347\224\262\357\274\2320", nullptr));
         enemyHpLabel->setText(QCoreApplication::translate("MainWindow", "\346\225\214\344\272\272\347\224\237\345\221\275\357\274\23260/60", nullptr));
         enemyIntentLabel->setText(QCoreApplication::translate("MainWindow", "\346\225\214\344\272\272\346\204\217\345\233\276\357\274\232\346\224\273\345\207\273 8", nullptr));
         cardButton1->setText(QCoreApplication::translate("MainWindow", "\346\231\256\351\200\232\346\224\273\345\207\273\n"
@@ -144,6 +152,10 @@ public:
         endTurnButton->setText(QCoreApplication::translate("MainWindow", "\347\273\223\346\235\237\345\233\236\345\220\210", nullptr));
         restartButton->setText(QCoreApplication::translate("MainWindow", "\351\207\215\346\226\260\345\274\200\345\247\213", nullptr));
         helpButton->setText(QCoreApplication::translate("MainWindow", "\346\270\270\346\210\217\350\257\264\346\230\216", nullptr));
+        drawPileLabel->setText(QCoreApplication::translate("MainWindow", "\346\212\275\347\211\214\345\240\206\n"
+"10", nullptr));
+        discardPileLabel->setText(QCoreApplication::translate("MainWindow", "\345\274\203\347\211\214\345\240\206\n"
+"0", nullptr));
     } // retranslateUi
 
 };
