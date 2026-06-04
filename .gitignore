@@ -1,0 +1,32 @@
+# Qt Creator 用户配置（每台电脑不同）
+*.pro.user
+*.pro.user.*
+
+# 编译产物
+build/
+Makefile
+Makefile.*
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+
+# Qt 自动生成的文件
+moc_*
+ui_*
+qrc_*
+
+# Qt Creator 项目缓存
+.qtcreator/
+*.autosave
+
+# IDE 通用
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
