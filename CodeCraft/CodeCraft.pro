@@ -11,10 +11,10 @@ INCLUDEPATH += . ../game
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
+    ../game/game_manager.cpp \
     ../game/battle.cpp \
     ../game/cards.cpp \
     ../game/enemy.cpp \
-    ../game/game_manager.cpp \
     ../game/minion.cpp \
     ../game/player.cpp
 
