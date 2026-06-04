@@ -4,7 +4,8 @@
 #include <functional>
 #include <vector>
 #include <memory>
-#include <string>
+#include <QString>
+#include <QVector>
 #include "player.h"
 #include "battle.h"
 #include "cards.h"
@@ -14,10 +15,10 @@
 // 回合流程、能量管理、牌组管理
 // ============================================================
 
-// ---- Qt 桥梁结构体（纯 C++，Qt 端用 QString::fromStdString 转换）----
+// ---- Qt 桥梁结构体 ----
 struct CardView {
-    std::string name;
-    std::string description;
+    QString name;
+    QString description;
     int cost = 0;
     TargetMode targetMode = TargetMode::NONE;
 };
@@ -33,7 +34,7 @@ struct PlayResult {
     bool success = false;
     int handIndex = -1;
     CardView card;
-    std::string failReason;
+    QString failReason;
 };
 
 struct TurnResult {
@@ -73,10 +74,10 @@ public:
     void discardHand();
 
     // ---- 查询（Qt 只读）----
-    std::vector<CardView> getHandView() const;
+    QVector<CardView> getHandView() const;
     int getDrawPileCount() const { return static_cast<int>(drawPile.size()); }
     int getDiscardPileCount() const { return static_cast<int>(discardPile.size()); }
-    std::string getEnemyIntentText() const;
+    QString getEnemyIntentText() const;
 
     // ---- 战斗开始（以后填入具体怪物）----
     void startBattle();

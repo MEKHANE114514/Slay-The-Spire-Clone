@@ -87,7 +87,9 @@ DrawResult GameManager::drawOneCard() {
     std::unique_ptr<Card> card = std::move(drawPile[idx]);
     drawPile.erase(drawPile.begin() + idx);
 
-    CardView view{card->name, card->description, card->cost, card->targetMode};
+    CardView view{QString::fromStdString(card->name),
+                  QString::fromStdString(card->description),
+                  card->cost, card->targetMode};
     int handIndex = static_cast<int>(hand.size());
     hand.push_back(std::move(card));
 
@@ -108,23 +110,25 @@ void GameManager::recycleDiscardToDrawPile() {
 
 PlayResult GameManager::playCard(int handIndex, Enemy* target) {
     if (handIndex < 0 || handIndex >= static_cast<int>(hand.size()))
-        return {false, handIndex, {}, "手牌不存在"};
+        return {false, handIndex, {}, QStringLiteral("手牌不存在")};
 
     Card* card = hand[handIndex].get();
-    if (!card) return {false, handIndex, {}, "手牌不存在"};
+    if (!card) return {false, handIndex, {}, QStringLiteral("手牌不存在")};
 
     if (!card->canPlay(player))
-        return {false, handIndex, {}, "当前无法打出此牌"};
+        return {false, handIndex, {}, QStringLiteral("当前无法打出此牌")};
 
     if (player.energy < card->cost)
-        return {false, handIndex, {}, "能量不足"};
+        return {false, handIndex, {}, QStringLiteral("能量不足")};
 
     // 扣能量 + 执行卡牌
     spendEnergy(card->cost);
     card->play(player, target);
 
     // 移到弃牌堆
-    CardView view{card->name, card->description, card->cost, card->targetMode};
+    CardView view{QString::fromStdString(card->name),
+                  QString::fromStdString(card->description),
+                  card->cost, card->targetMode};
     discardPile.push_back(std::move(hand[handIndex]));
     hand.erase(hand.begin() + handIndex);
 
@@ -141,26 +145,28 @@ void GameManager::discardHand() {
 // 查询（Qt 只读）
 // ============================================================
 
-std::vector<CardView> GameManager::getHandView() const {
-    std::vector<CardView> result;
+QVector<CardView> GameManager::getHandView() const {
+    QVector<CardView> result;
     for (auto& card : hand) {
         if (card)
-            result.push_back({card->name, card->description, card->cost, card->targetMode});
+            result.push_back({QString::fromStdString(card->name),
+                              QString::fromStdString(card->description),
+                              card->cost, card->targetMode});
         else
             result.push_back({});
     }
     return result;
 }
 
-std::string GameManager::getEnemyIntentText() const {
-    std::string text;
+QString GameManager::getEnemyIntentText() const {
+    QString text;
     for (auto& e : battle.enemies) {
-        if (!text.empty()) text += "\n";
-        text += e->name + "：" + e->nextIntent.name();
+        if (!text.isEmpty()) text += "\n";
+        text += QString::fromStdString(e->name + "：" + e->nextIntent.name());
         if (e->nextIntent.value > 0)
-            text += " " + std::to_string(e->nextIntent.value);
+            text += " " + QString::number(e->nextIntent.value);
     }
-    return text.empty() ? "无敌人" : text;
+    return text.isEmpty() ? QStringLiteral("无敌人") : text;
 }
 
 // ============================================================
