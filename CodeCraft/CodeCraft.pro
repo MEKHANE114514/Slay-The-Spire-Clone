@@ -8,7 +8,13 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    ../game/game_manager.cpp \
+    ../game/battle.cpp \
+    ../game/cards.cpp \
+    ../game/enemy.cpp \
+    ../game/minion.cpp \
+    ../game/player.cpp
 
 HEADERS += \
     mainwindow.h \

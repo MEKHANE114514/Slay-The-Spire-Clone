@@ -4,11 +4,13 @@
 #include <QMainWindow>
 #include <QVector>
 #include <QPushButton>
-#include <QString>
 #include <QStringList>
 #include <QRect>
 
 #include <functional>
+#include <memory>
+
+#include "game_manager.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -16,11 +18,7 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-struct CardView {
-    QString name;
-    QString description;
-    int cost = 0;
-};
+class Enemy;
 
 class MainWindow : public QMainWindow
 {
@@ -44,56 +42,55 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    // 日志缓存：不要到处直接操作 logTextEdit
+    // GameManager 相当于 GameState
+    std::unique_ptr<GameManager> gameManager;
+
+    // 日志缓存，不直接到处操作 logTextEdit
     QStringList logs;
 
-    // 手牌按钮：固定 5 个手牌槽位
+    // 固定 5 个手牌按钮
     QVector<QPushButton*> cardButtons;
 
-    // 当前阶段的临时牌堆，后续会被 GameState 替代
-    QVector<CardView> drawPile;
-    QVector<CardView> hand;
-    QVector<CardView> discardPile;
-
     // 初始化
-    void initUi();
+    void startNewGame();
     void initCardButtons();
-    void initDemoPiles();
 
-    // 刷新界面
-    void refreshUi();
-    void refreshHandUi();
-    void updatePileLabels();
-
-    // 日志
-    void appendLog(const QString& text);
-    void appendLogs(const QStringList& texts);
-    void clearLogs();
-    void refreshLogUi();
-
-    // 手牌与按钮状态
-    void clearHand();
-    void setCardButtonsEnabled(bool enabled);
-    int firstEmptyHandIndex() const;
-
-    // 坐标转换
-    QRect geometryInCentral(QWidget* widget) const;
-
-    // 抽牌相关
+    // 回合流程
+    void beginTurnWithoutAutoDraw();
     void startTurnDrawFive();
     void drawNextCard(int remainingCount);
+
+    // 出牌流程
+    void playCardByIndex(int index);
+
+    // 动画
     void drawOneCardAnimation(int handIndex,
                               const CardView& card,
                               std::function<void()> onFinished);
 
-    // 出牌相关
-    void playCardByIndex(int index);
     void playCardToDiscardAnimation(int index,
                                     const CardView& card,
                                     std::function<void()> onFinished);
 
-    // 洗牌动画：弃牌堆 -> 抽牌堆
     void recycleDiscardToDrawPileAnimation(std::function<void()> onFinished);
+
+    // 刷新界面
+    void refreshUi();
+    void refreshPlayerUi();
+    void refreshEnemyUi();
+    void refreshPileUi();
+    void refreshHandUi();
+
+    // 日志
+    void appendLog(const QString& text);
+    void clearLogs();
+    void refreshLogUi();
+
+    // 工具
+    QRect geometryInCentral(QWidget* widget) const;
+    void setCardButtonsEnabled(bool enabled);
+    Enemy* firstAliveEnemy() const;
+    QString toQString(const std::string& s) const;
 };
 
 #endif // MAINWINDOW_H

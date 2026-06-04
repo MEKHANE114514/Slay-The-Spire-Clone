@@ -1,0 +1,10 @@
+release/main.o
+release/mainwindow.o
+release/game_manager.o
+release/battle.o
+release/cards.o
+release/enemy.o
+release/minion.o
+release/player.o
+release/qrc_qmake_qmake_qm_files.o
+release/moc_mainwindow.o
