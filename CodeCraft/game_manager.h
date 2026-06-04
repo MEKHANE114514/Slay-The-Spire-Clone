@@ -44,6 +44,11 @@ struct TurnResult {
 
 class GameManager {
 public:
+    // ---- 关卡系统（静态，跨实例）----
+    static int currentLevel;
+    static void setLevel(int level) { currentLevel = level; }
+    static int getLevel() { return currentLevel; }
+
     Player player;
     BattleContext battle;
     int turnNumber = 0;
@@ -89,6 +94,8 @@ public:
     std::function<void()> onGameEnd;
 
 private:
+    void initLevel();                      // 根据 currentLevel 生成敌人
+    void initDeck();                       // 初始化基础牌组
     void finishBattle(bool playerWin);
 };
 

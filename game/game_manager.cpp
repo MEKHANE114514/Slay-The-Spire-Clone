@@ -3,10 +3,77 @@
 #include <ctime>     // time
 #include <algorithm> // shuffle, remove_if
 
+// 静态关卡变量定义
+int GameManager::currentLevel = 1;
+
 GameManager::GameManager()
     : battle(player)
 {
     srand(static_cast<unsigned>(time(nullptr)));
+    initLevel();
+    initDeck();
+}
+
+// ============================================================
+// 关卡初始化
+// ============================================================
+
+void GameManager::initLevel() {
+    switch (currentLevel) {
+        case 1:
+            battle.addEnemy(std::make_unique<Goblin>());
+            break;
+        case 2:
+            battle.addEnemy(std::make_unique<Goblin>());
+            battle.addEnemy(std::make_unique<Goblin>());
+            break;
+        case 3:
+            battle.addEnemy(std::make_unique<FireGoblin>());
+            battle.addEnemy(std::make_unique<FrozenGoblin>());
+            break;
+        case 4:
+            battle.addEnemy(std::make_unique<Goblin>());
+            battle.addEnemy(std::make_unique<Goblin>());
+            battle.addEnemy(std::make_unique<Caster>());
+            break;
+        case 5:
+            battle.addEnemy(std::make_unique<TemplateKing>());
+            break;
+        case 6:
+            battle.addEnemy(std::make_unique<FireGoblin>());
+            battle.addEnemy(std::make_unique<Caster>());
+            battle.addEnemy(std::make_unique<Goblin>());
+            break;
+        case 7:
+            battle.addEnemy(std::make_unique<Caster>());
+            battle.addEnemy(std::make_unique<Caster>());
+            battle.addEnemy(std::make_unique<FrozenGoblin>());
+            break;
+        case 8:
+            battle.addEnemy(std::make_unique<ExceptionLord>());
+            break;
+        default:
+            // 循环复用关卡 1
+            battle.addEnemy(std::make_unique<Goblin>());
+            break;
+    }
+}
+
+// ============================================================
+// 牌组初始化（基础牌组）
+// ============================================================
+
+void GameManager::initDeck() {
+    // 每种基础卡牌各放几张
+    for (int i = 0; i < 3; ++i) drawPile.push_back(std::make_unique<PowerStrikeCard>());
+    for (int i = 0; i < 3; ++i) drawPile.push_back(std::make_unique<DefendCard>());
+    for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<AttackEnhanceCard>());
+    for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<HealCard>());
+    for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<StrengthCard>());
+    drawPile.push_back(std::make_unique<SummonCard>());
+
+    // 洗牌
+    std::random_shuffle(drawPile.begin(), drawPile.end());
 }
 
 // ============================================================
