@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>900</width>
-    <height>600</height>
+    <width>1500</width>
+    <height>1000</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,8 +17,8 @@
    <widget class="QLabel" name="titleLabel">
     <property name="geometry">
      <rect>
-      <x>320</x>
-      <y>20</y>
+      <x>770</x>
+      <y>0</y>
       <width>121</width>
       <height>41</height>
      </rect>
@@ -36,8 +36,8 @@
    <widget class="QLabel" name="playerHpLabel">
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>90</y>
+      <x>30</x>
+      <y>50</y>
       <width>111</width>
       <height>20</height>
      </rect>
@@ -49,8 +49,8 @@
    <widget class="QLabel" name="playerEnergyLabel">
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>120</y>
+      <x>30</x>
+      <y>70</y>
       <width>101</width>
       <height>20</height>
      </rect>
@@ -62,8 +62,8 @@
    <widget class="QLabel" name="playerShieldLabel">
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>140</y>
+      <x>30</x>
+      <y>90</y>
       <width>111</width>
       <height>20</height>
      </rect>
@@ -75,8 +75,8 @@
    <widget class="QLabel" name="enemyHpLabel">
     <property name="geometry">
      <rect>
-      <x>590</x>
-      <y>90</y>
+      <x>1150</x>
+      <y>50</y>
       <width>101</width>
       <height>21</height>
      </rect>
@@ -88,8 +88,8 @@
    <widget class="QPushButton" name="cardButton1">
     <property name="geometry">
      <rect>
-      <x>130</x>
-      <y>370</y>
+      <x>570</x>
+      <y>850</y>
       <width>81</width>
       <height>101</height>
      </rect>
@@ -102,8 +102,8 @@
    <widget class="QPushButton" name="cardButton2">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>370</y>
+      <x>680</x>
+      <y>850</y>
       <width>81</width>
       <height>101</height>
      </rect>
@@ -116,8 +116,8 @@
    <widget class="QPushButton" name="cardButton3">
     <property name="geometry">
      <rect>
-      <x>340</x>
-      <y>370</y>
+      <x>780</x>
+      <y>850</y>
       <width>81</width>
       <height>101</height>
      </rect>
@@ -130,8 +130,8 @@
    <widget class="QPushButton" name="cardButton4">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>370</y>
+      <x>890</x>
+      <y>850</y>
       <width>81</width>
       <height>101</height>
      </rect>
@@ -144,8 +144,8 @@
    <widget class="QPushButton" name="cardButton5">
     <property name="geometry">
      <rect>
-      <x>550</x>
-      <y>370</y>
+      <x>990</x>
+      <y>850</y>
       <width>71</width>
       <height>101</height>
      </rect>
@@ -158,7 +158,7 @@
    <widget class="QTextEdit" name="logTextEdit">
     <property name="geometry">
      <rect>
-      <x>750</x>
+      <x>1330</x>
       <y>60</y>
       <width>131</width>
       <height>491</height>
@@ -181,7 +181,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QPushButton" name="endTurnButton">
     <property name="geometry">
      <rect>
-      <x>660</x>
+      <x>1230</x>
       <y>10</y>
       <width>61</width>
       <height>31</height>
@@ -194,7 +194,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QPushButton" name="restartButton">
     <property name="geometry">
      <rect>
-      <x>740</x>
+      <x>1310</x>
       <y>10</y>
       <width>61</width>
       <height>31</height>
@@ -207,7 +207,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QPushButton" name="helpButton">
     <property name="geometry">
      <rect>
-      <x>820</x>
+      <x>1390</x>
       <y>10</y>
       <width>61</width>
       <height>31</height>
@@ -220,8 +220,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QLabel" name="drawPileLabel">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>470</y>
+      <x>60</x>
+      <y>830</y>
       <width>51</width>
       <height>71</height>
      </rect>
@@ -234,8 +234,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QLabel" name="discardPileLabel">
     <property name="geometry">
      <rect>
-      <x>680</x>
-      <y>480</y>
+      <x>70</x>
+      <y>680</y>
       <width>51</width>
       <height>71</height>
      </rect>
@@ -248,11 +248,116 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QPlainTextEdit" name="codePlainTextEdit">
     <property name="geometry">
      <rect>
-      <x>260</x>
-      <y>80</y>
-      <width>221</width>
-      <height>271</height>
+      <x>630</x>
+      <y>50</y>
+      <width>351</width>
+      <height>761</height>
      </rect>
+    </property>
+    <property name="lineWrapMode">
+     <enum>QPlainTextEdit::LineWrapMode::NoWrap</enum>
+    </property>
+    <property name="readOnly">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="bossSkillLabel">
+    <property name="geometry">
+     <rect>
+      <x>1150</x>
+      <y>80</y>
+      <width>81</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>boos 技能</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+    </property>
+    <property name="wordWrap">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="minionHpLabel1">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>340</y>
+      <width>81</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>仆从1</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+    </property>
+    <property name="wordWrap">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="minionHpLabel2">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>460</y>
+      <width>81</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>仆从2</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+    </property>
+    <property name="wordWrap">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="playerStrengthLabel">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>110</y>
+      <width>241</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>玩家力量：</string>
+    </property>
+   </widget>
+   <widget class="QPlainTextEdit" name="playerTickCodePlainTextEdit">
+    <property name="geometry">
+     <rect>
+      <x>270</x>
+      <y>140</y>
+      <width>271</width>
+      <height>671</height>
+     </rect>
+    </property>
+    <property name="lineWrapMode">
+     <enum>QPlainTextEdit::LineWrapMode::NoWrap</enum>
+    </property>
+    <property name="readOnly">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QPlainTextEdit" name="enemyTickCodePlainTextEdit">
+    <property name="geometry">
+     <rect>
+      <x>1030</x>
+      <y>130</y>
+      <width>261</width>
+      <height>681</height>
+     </rect>
+    </property>
+    <property name="lineWrapMode">
+     <enum>QPlainTextEdit::LineWrapMode::NoWrap</enum>
     </property>
     <property name="readOnly">
      <bool>true</bool>
@@ -264,7 +369,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>900</width>
+     <width>1500</width>
      <height>18</height>
     </rect>
    </property>

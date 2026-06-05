@@ -290,7 +290,7 @@ void GameManager::discardHand() {
 QVector<CardView> GameManager::getHandView() const {
     QVector<CardView> result;
     for (auto& card : hand) {
-        if (card)
+        if (card) {
             result.push_back({QString::fromStdString(card->name),
                               QString::fromStdString(card->description),
                               card->cost, card->targetMode});
@@ -341,12 +341,4 @@ QStringList GameManager::buildEnemyCodeLines(Enemy* enemy) const {
         return {"// enemy_action", "enemy.wait();"};
     return {QString("// enemy_action"),
             QString("%1.takeTurn(player);").arg(QString::fromStdString(enemy->name))};
-}
-
-// ============================================================
-// 战斗收尾
-// ============================================================
-
-void GameManager::finishBattle(bool playerWin) {
-    if (onGameEnd) onGameEnd();
 }
