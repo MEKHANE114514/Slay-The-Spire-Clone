@@ -6,15 +6,7 @@
 // ============================================================
 // 完整的卡牌库 - 所有攻击函数牌
 // ============================================================
-
-// 攻击函数·强化：提升伤害倍率
-class AttackEnhanceCard : public FunctionCard {
-public:
-    AttackEnhanceCard() : FunctionCard("攻击函数·强化", "提升 50% 攻击伤害",
-        2, Rarity::COMMON, FunctionTarget::ATTACK) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new AttackEnhanceCard(); }
-};
+// 注意：AttackEnhanceCard 已在 cards.h 中定义，此处不重复
 
 // 攻击函数·暴击：概率双倍伤害
 class AttackCritCard : public FunctionCard {
@@ -23,6 +15,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackCritCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·溅射：对相邻敌人造成伤害
@@ -32,6 +25,7 @@ public:
         3, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackSplashCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·破甲：无视部分防御
@@ -41,6 +35,7 @@ public:
         2, Rarity::COMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackPierceCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·毒击：附加持续伤害
@@ -50,6 +45,7 @@ public:
         2, Rarity::COMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackPoisonCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·灼烧：附加灼烧效果
@@ -59,6 +55,7 @@ public:
         2, Rarity::COMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackBurnCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·冰冻：概率冻结目标
@@ -68,6 +65,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackFreezeCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·雷霆：连锁伤害
@@ -77,6 +75,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackLightningCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·暗影：随时间叠加
@@ -86,6 +85,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackShadowCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·神圣：对特定类型额外伤害
@@ -95,6 +95,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackHolyCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·回复：攻击时恢复生命
@@ -104,6 +105,7 @@ public:
         1, Rarity::COMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackHealCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·斩杀：对低生命目标巨额伤害
@@ -113,6 +115,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackExecuteCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·连携：每个仆从增伤
@@ -122,6 +125,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackSynergyCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·狂暴：生命越低伤害越高
@@ -131,6 +135,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackBerserkerCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·精准：无视闪避和减免
@@ -140,6 +145,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackPrecisionCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·吸取：降低目标攻击力
@@ -149,6 +155,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackWeakenCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·震荡：概率眩晕
@@ -158,6 +165,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackStunCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·回响：保留伤害记录
@@ -167,6 +175,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackEchoCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·蓄力：延时执行
@@ -176,6 +185,7 @@ public:
         1, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackChargeCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·标记：给目标打标记
@@ -185,6 +195,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackMarkCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·分裂：额外选中目标
@@ -194,6 +205,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackSplitCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·风怒：每回合可多次攻击
@@ -203,6 +215,7 @@ public:
         3, Rarity::RARE, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackWindfuryCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 攻击函数·吸收：伤害转化护盾
@@ -212,6 +225,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new AttackAbsorbCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // ============================================================
@@ -225,6 +239,7 @@ public:
         2, Rarity::COMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendIronWallCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·反伤：反弹伤害
@@ -234,6 +249,7 @@ public:
         3, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendReflectCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·回春：受击恢复生命
@@ -243,6 +259,7 @@ public:
         1, Rarity::COMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendRegenerationCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·护盾：优先消耗护盾
@@ -252,6 +269,7 @@ public:
         2, Rarity::COMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendShieldCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·闪避：概率完全躲避
@@ -261,6 +279,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendDodgeCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·硬皮：固定减免
@@ -270,6 +289,7 @@ public:
         1, Rarity::COMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendArmorCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·吸收：伤害转能量
@@ -279,6 +299,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendAbsorbCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·分摊：转移给仆从
@@ -288,6 +309,7 @@ public:
         3, Rarity::RARE, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendDistributeCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·固守：受击提升防御
@@ -297,6 +319,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendFortifyCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 受击函数·荆棘：固定反伤
@@ -306,6 +329,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendThornsCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 更多受击函数牌...（为节省篇幅，其余牌照此格式）
@@ -321,6 +345,7 @@ public:
         2, Rarity::COMMON, FunctionTarget::SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new SummonEnhanceCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 构造函数·量产
@@ -330,6 +355,7 @@ public:
         3, Rarity::UNCOMMON, FunctionTarget::SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new SummonMassCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 复制构造·精准
@@ -339,6 +365,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::COPY_SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new CopyPrecisionCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 复制构造·增殖
@@ -348,6 +375,7 @@ public:
         3, Rarity::RARE, FunctionTarget::COPY_SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new CopyMultiplyCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 复制构造·改良
@@ -357,6 +385,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::COPY_SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new CopyImproveCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 移动构造·榨取
@@ -366,6 +395,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::MOVE_SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new MoveExtractCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 移动构造·遗骸
@@ -375,6 +405,7 @@ public:
         1, Rarity::COMMON, FunctionTarget::MOVE_SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new MoveRemnantsCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 移动构造·共鸣
@@ -384,6 +415,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::MOVE_SUMMON) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new MoveResonanceCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 析构函数·爆裂
@@ -393,6 +425,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::SACRIFICE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new SacrificeExplodeCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 析构函数·传承
@@ -402,6 +435,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::SACRIFICE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new SacrificeInheritCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 析构函数·重生
@@ -411,6 +445,7 @@ public:
         1, Rarity::UNCOMMON, FunctionTarget::SACRIFICE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new SacrificeRebornCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 逃跑函数·诡步
@@ -420,6 +455,7 @@ public:
         1, Rarity::COMMON, FunctionTarget::ESCAPE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new EscapeNimbleCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 逃跑函数·金蝉脱壳
@@ -429,6 +465,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ESCAPE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new EscapeMoltCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 // 逃跑函数·断后
@@ -438,6 +475,7 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::ESCAPE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new EscapeRearguardCard(); }
+    std::vector<std::string> getCodeLines() const override;
 };
 
 #endif // CARDS_FULL_H
