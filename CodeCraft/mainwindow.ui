@@ -17,8 +17,8 @@
    <widget class="QLabel" name="titleLabel">
     <property name="geometry">
      <rect>
-      <x>250</x>
-      <y>30</y>
+      <x>320</x>
+      <y>20</y>
       <width>121</width>
       <height>41</height>
      </rect>
@@ -36,8 +36,8 @@
    <widget class="QLabel" name="playerHpLabel">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>36</y>
+      <x>60</x>
+      <y>90</y>
       <width>111</width>
       <height>20</height>
      </rect>
@@ -49,8 +49,8 @@
    <widget class="QLabel" name="playerEnergyLabel">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>66</y>
+      <x>60</x>
+      <y>120</y>
       <width>101</width>
       <height>20</height>
      </rect>
@@ -62,8 +62,8 @@
    <widget class="QLabel" name="playerShieldLabel">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>96</y>
+      <x>60</x>
+      <y>140</y>
       <width>111</width>
       <height>20</height>
      </rect>
@@ -75,8 +75,8 @@
    <widget class="QLabel" name="enemyHpLabel">
     <property name="geometry">
      <rect>
-      <x>460</x>
-      <y>50</y>
+      <x>590</x>
+      <y>90</y>
       <width>101</width>
       <height>21</height>
      </rect>
@@ -88,8 +88,8 @@
    <widget class="QLabel" name="enemyIntentLabel">
     <property name="geometry">
      <rect>
-      <x>460</x>
-      <y>80</y>
+      <x>590</x>
+      <y>130</y>
       <width>111</width>
       <height>21</height>
      </rect>
@@ -101,10 +101,10 @@
    <widget class="QPushButton" name="cardButton1">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>120</y>
-      <width>71</width>
-      <height>41</height>
+      <x>130</x>
+      <y>370</y>
+      <width>81</width>
+      <height>101</height>
      </rect>
     </property>
     <property name="text">
@@ -115,10 +115,10 @@
    <widget class="QPushButton" name="cardButton2">
     <property name="geometry">
      <rect>
-      <x>150</x>
-      <y>120</y>
-      <width>61</width>
-      <height>41</height>
+      <x>240</x>
+      <y>370</y>
+      <width>81</width>
+      <height>101</height>
      </rect>
     </property>
     <property name="text">
@@ -129,10 +129,10 @@
    <widget class="QPushButton" name="cardButton3">
     <property name="geometry">
      <rect>
-      <x>260</x>
-      <y>120</y>
-      <width>61</width>
-      <height>41</height>
+      <x>340</x>
+      <y>370</y>
+      <width>81</width>
+      <height>101</height>
      </rect>
     </property>
     <property name="text">
@@ -143,10 +143,10 @@
    <widget class="QPushButton" name="cardButton4">
     <property name="geometry">
      <rect>
-      <x>370</x>
-      <y>120</y>
-      <width>91</width>
-      <height>41</height>
+      <x>450</x>
+      <y>370</y>
+      <width>81</width>
+      <height>101</height>
      </rect>
     </property>
     <property name="text">
@@ -157,10 +157,10 @@
    <widget class="QPushButton" name="cardButton5">
     <property name="geometry">
      <rect>
-      <x>490</x>
-      <y>120</y>
+      <x>550</x>
+      <y>370</y>
       <width>71</width>
-      <height>41</height>
+      <height>101</height>
      </rect>
     </property>
     <property name="text">
@@ -171,10 +171,10 @@
    <widget class="QTextEdit" name="logTextEdit">
     <property name="geometry">
      <rect>
-      <x>610</x>
-      <y>80</y>
-      <width>201</width>
-      <height>221</height>
+      <x>750</x>
+      <y>60</y>
+      <width>131</width>
+      <height>491</height>
      </rect>
     </property>
     <property name="readOnly">
@@ -233,10 +233,10 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QLabel" name="drawPileLabel">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>250</y>
-      <width>40</width>
-      <height>51</height>
+      <x>40</x>
+      <y>470</y>
+      <width>51</width>
+      <height>71</height>
      </rect>
     </property>
     <property name="text">
@@ -247,15 +247,28 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <widget class="QLabel" name="discardPileLabel">
     <property name="geometry">
      <rect>
-      <x>490</x>
-      <y>250</y>
-      <width>40</width>
-      <height>51</height>
+      <x>680</x>
+      <y>480</y>
+      <width>51</width>
+      <height>71</height>
      </rect>
     </property>
     <property name="text">
      <string>弃牌堆
 0</string>
+    </property>
+   </widget>
+   <widget class="QPlainTextEdit" name="codePlainTextEdit">
+    <property name="geometry">
+     <rect>
+      <x>260</x>
+      <y>80</y>
+      <width>221</width>
+      <height>271</height>
+     </rect>
+    </property>
+    <property name="readOnly">
+     <bool>true</bool>
     </property>
    </widget>
   </widget>

@@ -30,3 +30,10 @@ qrc_*
 # 系统文件
 .DS_Store
 Thumbs.db
+
+build/
+debug/
+release/
+*.o
+*.user
+*.pro.user

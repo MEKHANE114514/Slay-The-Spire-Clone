@@ -14,6 +14,7 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QMenuBar>
+#include <QtWidgets/QPlainTextEdit>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QStatusBar>
 #include <QtWidgets/QTextEdit>
@@ -42,6 +43,7 @@ public:
     QPushButton *helpButton;
     QLabel *drawPileLabel;
     QLabel *discardPileLabel;
+    QPlainTextEdit *codePlainTextEdit;
     QMenuBar *menubar;
     QStatusBar *statusbar;
 
@@ -54,44 +56,44 @@ public:
         centralwidget->setObjectName("centralwidget");
         titleLabel = new QLabel(centralwidget);
         titleLabel->setObjectName("titleLabel");
-        titleLabel->setGeometry(QRect(250, 30, 121, 41));
+        titleLabel->setGeometry(QRect(320, 20, 121, 41));
         QFont font;
         font.setPointSize(18);
         font.setBold(true);
         titleLabel->setFont(font);
         playerHpLabel = new QLabel(centralwidget);
         playerHpLabel->setObjectName("playerHpLabel");
-        playerHpLabel->setGeometry(QRect(40, 36, 111, 20));
+        playerHpLabel->setGeometry(QRect(60, 90, 111, 20));
         playerEnergyLabel = new QLabel(centralwidget);
         playerEnergyLabel->setObjectName("playerEnergyLabel");
-        playerEnergyLabel->setGeometry(QRect(40, 66, 101, 20));
+        playerEnergyLabel->setGeometry(QRect(60, 120, 101, 20));
         playerShieldLabel = new QLabel(centralwidget);
         playerShieldLabel->setObjectName("playerShieldLabel");
-        playerShieldLabel->setGeometry(QRect(40, 96, 111, 20));
+        playerShieldLabel->setGeometry(QRect(60, 140, 111, 20));
         enemyHpLabel = new QLabel(centralwidget);
         enemyHpLabel->setObjectName("enemyHpLabel");
-        enemyHpLabel->setGeometry(QRect(460, 50, 101, 21));
+        enemyHpLabel->setGeometry(QRect(590, 90, 101, 21));
         enemyIntentLabel = new QLabel(centralwidget);
         enemyIntentLabel->setObjectName("enemyIntentLabel");
-        enemyIntentLabel->setGeometry(QRect(460, 80, 111, 21));
+        enemyIntentLabel->setGeometry(QRect(590, 130, 111, 21));
         cardButton1 = new QPushButton(centralwidget);
         cardButton1->setObjectName("cardButton1");
-        cardButton1->setGeometry(QRect(40, 120, 71, 41));
+        cardButton1->setGeometry(QRect(130, 370, 81, 101));
         cardButton2 = new QPushButton(centralwidget);
         cardButton2->setObjectName("cardButton2");
-        cardButton2->setGeometry(QRect(150, 120, 61, 41));
+        cardButton2->setGeometry(QRect(240, 370, 81, 101));
         cardButton3 = new QPushButton(centralwidget);
         cardButton3->setObjectName("cardButton3");
-        cardButton3->setGeometry(QRect(260, 120, 61, 41));
+        cardButton3->setGeometry(QRect(340, 370, 81, 101));
         cardButton4 = new QPushButton(centralwidget);
         cardButton4->setObjectName("cardButton4");
-        cardButton4->setGeometry(QRect(370, 120, 91, 41));
+        cardButton4->setGeometry(QRect(450, 370, 81, 101));
         cardButton5 = new QPushButton(centralwidget);
         cardButton5->setObjectName("cardButton5");
-        cardButton5->setGeometry(QRect(490, 120, 71, 41));
+        cardButton5->setGeometry(QRect(550, 370, 71, 101));
         logTextEdit = new QTextEdit(centralwidget);
         logTextEdit->setObjectName("logTextEdit");
-        logTextEdit->setGeometry(QRect(610, 80, 201, 221));
+        logTextEdit->setGeometry(QRect(750, 60, 131, 491));
         logTextEdit->setReadOnly(true);
         endTurnButton = new QPushButton(centralwidget);
         endTurnButton->setObjectName("endTurnButton");
@@ -104,10 +106,14 @@ public:
         helpButton->setGeometry(QRect(820, 10, 61, 31));
         drawPileLabel = new QLabel(centralwidget);
         drawPileLabel->setObjectName("drawPileLabel");
-        drawPileLabel->setGeometry(QRect(50, 250, 40, 51));
+        drawPileLabel->setGeometry(QRect(40, 470, 51, 71));
         discardPileLabel = new QLabel(centralwidget);
         discardPileLabel->setObjectName("discardPileLabel");
-        discardPileLabel->setGeometry(QRect(490, 250, 40, 51));
+        discardPileLabel->setGeometry(QRect(680, 480, 51, 71));
+        codePlainTextEdit = new QPlainTextEdit(centralwidget);
+        codePlainTextEdit->setObjectName("codePlainTextEdit");
+        codePlainTextEdit->setGeometry(QRect(260, 80, 221, 271));
+        codePlainTextEdit->setReadOnly(true);
         MainWindow->setCentralWidget(centralwidget);
         menubar = new QMenuBar(MainWindow);
         menubar->setObjectName("menubar");

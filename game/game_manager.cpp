@@ -21,7 +21,8 @@ GameManager::GameManager()
 void GameManager::initLevel() {
     switch (currentLevel) {
         case 1:
-            battle.addEnemy(std::make_unique<Goblin>());
+            battle.addEnemy(std::make_unique<ExceptionLord>());
+           // battle.addEnemy(std::make_unique<Goblin>());
             break;
         case 2:
             battle.addEnemy(std::make_unique<Goblin>());

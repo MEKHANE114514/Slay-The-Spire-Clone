@@ -40,28 +40,40 @@ private slots:
     void on_helpButton_clicked();
 
 private:
+    struct CodeRange {
+        int startLine = -1;   // QPlainTextEdit 中的 0-based 行号
+        int lineCount = 0;    // 需要高亮几行；for/if 块会大于 1
+    };
+
+private:
     Ui::MainWindow *ui;
 
-    // GameManager 相当于 GameState
     std::unique_ptr<GameManager> gameManager;
 
-    // 日志缓存，不直接到处操作 logTextEdit
     QStringList logs;
-
-    // 固定 5 个手牌按钮
     QVector<QPushButton*> cardButtons;
+    QVector<CodeRange> codeRanges;
+
+    int executionToken = 0;       // 重新开始时让旧的 QTimer 回调失效
+    bool controlsEnabled = false; // 当前是否允许玩家点击卡牌/结束回合
 
     // 初始化
-    void startNewGame();
     void initCardButtons();
+    void initCodeEditor();
+    void startNewGame();
 
     // 回合流程
     void beginTurnWithoutAutoDraw();
     void startTurnDrawFive();
     void drawNextCard(int remainingCount);
 
-    // 出牌流程
+    // 出牌流程：出牌只写入代码，不立即结算效果
     void playCardByIndex(int index);
+
+    // 结束回合后的代码执行流程
+    void executeCodeQueue();
+    void executeNextCode(int index, int token);
+    void showGameOverMessage();
 
     // 动画
     void drawOneCardAnimation(int handIndex,
@@ -80,6 +92,11 @@ private:
     void refreshEnemyUi();
     void refreshPileUi();
     void refreshHandUi();
+    void refreshCodeEditor();
+
+    // 代码高亮
+    void highlightCodeBlock(int commandIndex);
+    void clearCodeHighlight();
 
     // 日志
     void appendLog(const QString& text);
@@ -88,9 +105,9 @@ private:
 
     // 工具
     QRect geometryInCentral(QWidget* widget) const;
-    void setCardButtonsEnabled(bool enabled);
+    void setControlsEnabled(bool enabled);
     Enemy* firstAliveEnemy() const;
-    QString toQString(const std::string& s) const;
+    QString formatCardText(const CardView& card) const;
 };
 
 #endif // MAINWINDOW_H
