@@ -72,6 +72,8 @@ public:
     void prepareTurnCodeBlock();
     void prepareAttackCodeBlock();
     void prepareEndCodeBlock();
+    std::vector<std::string> getPlayerCodeLines() const;
+    std::vector<std::string> getEnemyCodeLines(Enemy* enemy) const;
     TurnResult finishTurnAfterCodeExecution();
     bool isBattleOver() const { return battle.isBattleOver(); }
     bool isPlayerWin() const { return battle.allEnemiesDead(); }
@@ -121,3 +123,4 @@ private:
 };
 
 #endif // GAME_MANAGER_H
+

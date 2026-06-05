@@ -95,6 +95,15 @@ void GameManager::prepareTurnCodeBlock() {
     prepareEndCodeBlock();
 }
 
+std::vector<std::string> GameManager::getPlayerCodeLines() const {
+    return battle.player.getCodeLines();
+}
+
+std::vector<std::string> GameManager::getEnemyCodeLines(Enemy* enemy) const {
+    if (!enemy) return {};
+    return enemy->getStatusesCode();
+}
+
 void GameManager::prepareAttackCodeBlock() {
     // 仆从逐个攻击（倒序）
     for (int i = static_cast<int>(player.minions.size()) - 1; i >= 0; --i) {

@@ -22,7 +22,7 @@ public:
     std::string name;
     int hp, maxHp;
     int attack;
-    int shield;
+    int shield=0;
     MinionType type = MinionType::NORMAL;
     std::vector<Status> statuses;
 
