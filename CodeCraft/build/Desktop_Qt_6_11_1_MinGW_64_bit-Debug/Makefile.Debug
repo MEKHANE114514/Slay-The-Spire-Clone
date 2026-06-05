@@ -958,6 +958,7 @@ debug/game_manager.o: ../../../game/game_manager.cpp ../../game_manager.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/q20bit.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/qsimd.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/qstringmatcher.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QStringList \
 		../../player.h \
 		../../types.h \
 		../../minion.h \

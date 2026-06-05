@@ -146,7 +146,7 @@ void MainWindow::drawNextCard(int remainingCount)
     DrawResult result = gameManager->drawOneCard();
 
     if (result.needRecycle) {
-        appendLog("抽牌堆为空，弃牌堆放回抽牌堆�?);
+        appendLog("抽牌堆为空，弃牌堆放回抽牌堆?");
 
         recycleDiscardToDrawPileAnimation([this, remainingCount]() {
             if (!gameManager) {
@@ -472,7 +472,7 @@ void MainWindow::refreshPlayerUi()
             .arg(player.maxEnergy)
     );
 
-    ui->playerArmorLabel->setText(
+    ui->playerShieldLabel->setText(
         QString("玩家护盾：%1")
             .arg(player.shield)
     );
@@ -486,13 +486,11 @@ void MainWindow::refreshEnemyUi()
         ui->enemyHpLabel->setText("敌人生命：无");
     } else {
         ui->enemyHpLabel->setText(
-            QString("敌人生命�?1/%2")
+            QString("敌人生命%1/%2")
                 .arg(enemy->hp)
                 .arg(enemy->maxHp)
         );
     }
-
-    ui->enemyIntentLabel->setText(gameManager->getEnemyIntentText());
 }
 
 void MainWindow::refreshPileUi()

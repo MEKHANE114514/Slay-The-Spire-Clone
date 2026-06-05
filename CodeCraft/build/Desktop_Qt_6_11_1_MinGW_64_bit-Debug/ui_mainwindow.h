@@ -31,7 +31,6 @@ public:
     QLabel *playerEnergyLabel;
     QLabel *playerShieldLabel;
     QLabel *enemyHpLabel;
-    QLabel *enemyIntentLabel;
     QPushButton *cardButton1;
     QPushButton *cardButton2;
     QPushButton *cardButton3;
@@ -73,9 +72,6 @@ public:
         enemyHpLabel = new QLabel(centralwidget);
         enemyHpLabel->setObjectName("enemyHpLabel");
         enemyHpLabel->setGeometry(QRect(590, 90, 101, 21));
-        enemyIntentLabel = new QLabel(centralwidget);
-        enemyIntentLabel->setObjectName("enemyIntentLabel");
-        enemyIntentLabel->setGeometry(QRect(590, 130, 111, 21));
         cardButton1 = new QPushButton(centralwidget);
         cardButton1->setObjectName("cardButton1");
         cardButton1->setGeometry(QRect(130, 370, 81, 101));
@@ -136,7 +132,6 @@ public:
         playerEnergyLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\350\203\275\351\207\217\357\274\2323", nullptr));
         playerShieldLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\346\212\244\347\224\262\357\274\2320", nullptr));
         enemyHpLabel->setText(QCoreApplication::translate("MainWindow", "\346\225\214\344\272\272\347\224\237\345\221\275\357\274\23260/60", nullptr));
-        enemyIntentLabel->setText(QCoreApplication::translate("MainWindow", "\346\225\214\344\272\272\346\204\217\345\233\276\357\274\232\346\224\273\345\207\273 8", nullptr));
         cardButton1->setText(QCoreApplication::translate("MainWindow", "\346\231\256\351\200\232\346\224\273\345\207\273\n"
 "\350\264\271\347\224\250\357\274\2321", nullptr));
         cardButton2->setText(QCoreApplication::translate("MainWindow", "\351\230\262\345\276\241\n"

@@ -85,19 +85,6 @@
      <string>敌人生命：60/60</string>
     </property>
    </widget>
-   <widget class="QLabel" name="enemyIntentLabel">
-    <property name="geometry">
-     <rect>
-      <x>590</x>
-      <y>130</y>
-      <width>111</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>敌人意图：攻击 8</string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="cardButton1">
     <property name="geometry">
      <rect>
