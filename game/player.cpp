@@ -1,5 +1,6 @@
 #include "player.h"
 #include "enemy.h"       // initDefaultFunctions 中调用 target.takeDamage()
+#include "game_text.h"   // statusName()
 #include <algorithm>     // std::min, std::remove_if, std::any_of
 #include <cstdlib>       // rand
 
@@ -219,6 +220,60 @@ void Player::tickStatuses() {
 
     // 生命变化通知
     if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp, hp - oldHp);
+}
+
+std::vector<std::string> Player::getStatusesCode() const {
+    std::vector<std::string> lines;
+    for (const auto& s : statuses) {
+        std::string effect;
+        switch (s.type) {
+            case StatusType::BURN:
+                effect = "hp-=" + std::to_string(s.value);
+                break;
+            case StatusType::POISON:
+                effect = "hp-=" + std::to_string(s.value) + "(↑)";
+                break;
+            case StatusType::REGEN:
+                effect = "hp+=" + std::to_string(s.value);
+                break;
+            case StatusType::STRENGTH:
+                effect = "atk+=" + std::to_string(s.value);
+                break;
+            case StatusType::WEAKEN:
+                effect = "atk-=" + std::to_string(s.value);
+                break;
+            case StatusType::VULNERABLE:
+                effect = "dmgTaken+" + std::to_string(s.value) + "%";
+                break;
+            case StatusType::FREEZE:
+            case StatusType::STUN:
+                effect = "skip";
+                break;
+            case StatusType::FORTIFY:
+                effect = "onHit:shield+=" + std::to_string(s.value);
+                break;
+            case StatusType::RAGE:
+                effect = "onHit:atk+=" + std::to_string(s.value);
+                break;
+            case StatusType::DODGE:
+                effect = "dodge " + std::to_string(s.value) + "%";
+                break;
+            case StatusType::INVINCIBLE:
+                effect = "immune";
+                break;
+            case StatusType::MARK:
+                effect = "dmgTaken+" + std::to_string(s.value) + "%";
+                break;
+            default:
+                effect = "?";
+                break;
+        }
+        std::string turns = (s.turnsRemaining > 0)
+            ? std::to_string(s.turnsRemaining) + "回合"
+            : "永久";
+        lines.push_back(effect + " //" + statusName(s.type) + "，" + turns);
+    }
+    return lines;
 }
 
 void Player::resetActionLimits() {

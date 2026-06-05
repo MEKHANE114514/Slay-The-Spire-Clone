@@ -168,10 +168,6 @@ void GameManager::prepareEndCodeBlock() {
 }
 
 TurnResult GameManager::finishTurnAfterCodeExecution() {
-    if (isBattleOver()) { if (onGameEnd) onGameEnd(); return {true, isPlayerWin()}; }
-
-    if (battle.onTurnEnd) battle.onTurnEnd(turnNumber);
-
     if (battle.onTurnEnd) battle.onTurnEnd(turnNumber);
 
     return {false, false};

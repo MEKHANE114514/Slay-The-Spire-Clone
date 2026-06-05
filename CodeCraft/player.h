@@ -99,6 +99,7 @@ public:
     void removeStatus(StatusType type);
     bool hasStatus(StatusType type) const;
     void tickStatuses();            // 回合结束：倒计时、灼烧扣血……
+    std::vector<std::string> getStatusesCode() const;  // 当前状态的中文代码行
     void resetActionLimits();       // 新回合重置次数
 
     // ===== 攻击力计算 =====

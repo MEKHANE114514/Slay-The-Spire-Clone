@@ -56,6 +56,7 @@ public:
     virtual void addStatus(Status s);
     bool hasStatus(StatusType t) const;
     void tickStatuses();
+    std::vector<std::string> getStatusesCode() const;  // 当前状态的中文代码行
     bool isDisabled() const {
         return hasStatus(StatusType::FREEZE) || hasStatus(StatusType::STUN);
     }
