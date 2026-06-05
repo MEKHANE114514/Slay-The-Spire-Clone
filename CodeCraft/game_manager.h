@@ -21,8 +21,6 @@ struct CardView {
     QString name;
     QString description;
     int cost = 0;
-    CardType type = CardType::COMMAND;
-    FunctionTarget funcTarget = FunctionTarget::ATTACK;
     TargetMode targetMode = TargetMode::NONE;
 };
 
@@ -118,7 +116,6 @@ private:
     };
     QVector<PendingCodeCommand> pendingCommands;
 
-    QStringList buildCardCodeLines(const CardView& card) const;
     QStringList buildEnemyCodeLines(Enemy* enemy) const;
     void insertPlayerCommandBeforeEnemy(PendingCodeCommand cmd);
 };

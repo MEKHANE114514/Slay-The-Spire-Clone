@@ -222,12 +222,9 @@ DrawResult GameManager::drawOneCard() {
     std::unique_ptr<Card> card = std::move(drawPile[idx]);
     drawPile.erase(drawPile.begin() + idx);
 
-    FunctionCard* fc = dynamic_cast<FunctionCard*>(card.get());
     CardView view{QString::fromStdString(card->name),
                   QString::fromStdString(card->description),
-                  card->cost, card->type,
-                  fc ? fc->target : FunctionTarget::ATTACK,
-                  card->targetMode};
+                  card->cost, card->targetMode};
     int handIndex = static_cast<int>(hand.size());
     hand.push_back(std::move(card));
 
@@ -258,20 +255,22 @@ PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
 
     spendEnergy(card->cost);
 
-    FunctionCard* fc = dynamic_cast<FunctionCard*>(card);
     CardView view{QString::fromStdString(card->name),
                   QString::fromStdString(card->description),
-                  card->cost, card->type,
-                  fc ? fc->target : FunctionTarget::ATTACK,
-                  card->targetMode};
+                  card->cost, card->targetMode};
 
     // 不立即执行，而是挂入代码队列
     Card* rawCard = card;
     Enemy* rawTarget = target;
 
+    // 从卡牌自身获取代码行
+    QStringList lines;
+    for (auto& s : card->getCodeLines())
+        lines << QString::fromStdString(s);
+
     PendingCodeCommand cmd;
     cmd.title = view.name;
-    cmd.lines = buildCardCodeLines(view);
+    cmd.lines = lines;
     cmd.effect = [this, rawCard, rawTarget]() { rawCard->play(player, rawTarget); };
 
     insertPlayerCommandBeforeEnemy(std::move(cmd));
@@ -295,13 +294,10 @@ void GameManager::discardHand() {
 QVector<CardView> GameManager::getHandView() const {
     QVector<CardView> result;
     for (auto& card : hand) {
-        if (card) {
-            FunctionCard* fc = dynamic_cast<FunctionCard*>(card.get());
+        if (card)
             result.push_back({QString::fromStdString(card->name),
                               QString::fromStdString(card->description),
-                              card->cost, card->type,
-                              fc ? fc->target : FunctionTarget::ATTACK,
-                              card->targetMode});
+                              card->cost, card->targetMode});
         } else {
             result.push_back({});
         }
@@ -342,32 +338,6 @@ void GameManager::insertPlayerCommandBeforeEnemy(PendingCodeCommand cmd) {
         }
     }
     pendingCommands.insert(insertPos, std::move(cmd));
-}
-
-QStringList GameManager::buildCardCodeLines(const CardView& card) const {
-    if (card.type == CardType::FUNCTION) {
-        // 函数牌：显示修改哪个函数的代码
-        switch (card.funcTarget) {
-            case FunctionTarget::ATTACK:
-                return {QString("player.setAttackFunc(...);  // %1").arg(card.name)};
-            case FunctionTarget::TAKE_DAMAGE:
-                return {QString("player.setTakeDamageFunc(...);  // %1").arg(card.name)};
-            case FunctionTarget::SUMMON:
-                return {QString("player.setSummonFunc(...);  // %1").arg(card.name)};
-            case FunctionTarget::COPY_SUMMON:
-                return {QString("player.setCopySummonFunc(...);  // %1").arg(card.name)};
-            case FunctionTarget::MOVE_SUMMON:
-                return {QString("player.setMoveSummonFunc(...);  // %1").arg(card.name)};
-            case FunctionTarget::SACRIFICE:
-                return {QString("player.setSacrificeFunc(...);  // %1").arg(card.name)};
-            case FunctionTarget::ESCAPE:
-                return {QString("player.setEscapeFunc(...);  // %1").arg(card.name)};
-        }
-    }
-    if (card.type == CardType::TEMPLATE)
-        return {QString("template.apply(player, enemy);  // %1").arg(card.name)};
-    // 指令牌
-    return {QString("card.play(player, enemy);  // %1").arg(card.name)};
 }
 
 QStringList GameManager::buildEnemyCodeLines(Enemy* enemy) const {

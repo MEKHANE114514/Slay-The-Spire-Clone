@@ -41,6 +41,7 @@ public:
     virtual void play(Player& player, Enemy* target = nullptr) = 0;
     virtual bool canPlay(const Player& player) const;
     virtual Card* clone() const = 0;
+    virtual std::vector<std::string> getCodeLines() const;
 };
 
 // ============================================================
@@ -57,6 +58,7 @@ public:
         , target(ft) {}
 
     virtual void play(Player& player, Enemy* enemy = nullptr) = 0;
+    std::vector<std::string> getCodeLines() const override;
 
 protected:
     static std::string getFunctionName(FunctionTarget ft);
@@ -92,6 +94,7 @@ public:
     }
 
     void play(Player& player, Enemy* target = nullptr) override;
+    std::vector<std::string> getCodeLines() const override;
     virtual void applyWrapper(Player& player, Enemy* target) = 0;
     Card* clone() const override;
 

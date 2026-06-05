@@ -13,6 +13,10 @@ bool Card::canPlay(const Player& player) const {
     return player.energy >= cost && !player.isDisabled();
 }
 
+std::vector<std::string> Card::getCodeLines() const {
+    return {"card.play(player, enemy);  // " + name};
+}
+
 // ============================================================
 // FunctionCard 辅助方法
 // ============================================================
@@ -30,6 +34,15 @@ std::string FunctionCard::getFunctionName(FunctionTarget ft) {
     }
 }
 
+std::vector<std::string> FunctionCard::getCodeLines() const {
+    static const std::string names[] = {
+        "Attack", "TakeDamage", "Summon",
+        "CopySummon", "MoveSummon", "Sacrifice", "Escape"
+    };
+    int idx = static_cast<int>(target);
+    return {"player.set" + names[idx] + "Func(...);  // " + name};
+}
+
 // ============================================================
 // TemplateCard 基础实现
 // ============================================================
@@ -45,6 +58,12 @@ Card* TemplateCard::clone() const {
         cloned->setWrappedCard(static_cast<FunctionCard*>(wrappedCard->clone()));
     }
     return cloned;
+}
+
+std::vector<std::string> TemplateCard::getCodeLines() const {
+    if (wrappedCard)
+        return {"template.apply(player, enemy);  // " + name + " (" + wrappedCard->name + ")"};
+    return {"template.apply(player, enemy);  // " + name};
 }
 
 // ============================================================
