@@ -2,6 +2,7 @@
 #define CARDS_H
 
 #include <string>
+#include <vector>
 #include <functional>
 #include <memory>
 #include "types.h"

@@ -248,7 +248,7 @@ public:
 // 受击函数·护盾：优先消耗护盾
 class DefendShieldCard : public FunctionCard {
 public:
-    DefendShieldCard() : FunctionCard("受击函数·护盾", "受击时优先消耗护盾",
+    DefendShieldCard() : FunctionCard("受击函数·护盾", "获得 6 点护盾",
         2, Rarity::COMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DefendShieldCard(); }
