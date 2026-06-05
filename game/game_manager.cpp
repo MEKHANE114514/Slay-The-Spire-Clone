@@ -96,7 +96,7 @@ void GameManager::prepareTurnCodeBlock() {
 }
 
 std::vector<std::string> GameManager::getPlayerCodeLines() const {
-    return battle.player.getCodeLines();
+    return battle.player.getStatusesCode();
 }
 
 std::vector<std::string> GameManager::getEnemyCodeLines(Enemy* enemy) const {

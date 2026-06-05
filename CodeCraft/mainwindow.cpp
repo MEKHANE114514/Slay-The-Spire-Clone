@@ -1,48 +1,100 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-#include <QPropertyAnimation>
+#include <QColor>
+#include <QEasingCurve>
+#include <QFont>
+#include <QLabel>
 #include <QMessageBox>
-#include <QTextCursor>
+#include <QPropertyAnimation>
+#include <QScrollBar>
 #include <QTextBlock>
+#include <QTextCharFormat>
+#include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
-#include <QPlainTextEdit>
-#include <QLabel>
-#include <QTextCharFormat>
-#include <QEasingCurve>
 #include <QTimer>
-#include <QVariantAnimation>
-#include <QColor>
-#include <QFont>
+
 #include <algorithm>
 
 namespace {
-constexpr int HAND_SLOT_COUNT = 5;
-constexpr int MINION_SLOT_COUNT = 2;
-constexpr int CODE_EXECUTE_DELAY_MS = 700;
-constexpr int CODE_EXECUTE_INTERVAL_MS = 350;
-constexpr int FUNCTION_FADE_DURATION_MS = 1200;
+constexpr int MAIN_EXEC_MS = 800;
+constexpr int MAIN_GAP_MS = 450;
+constexpr int SIDE_CHANGE_MS = 1400;
+constexpr int SIDE_POLL_MS = 80;
 
-QString turnsText(int turns)
+const QColor kMainRunColor(210, 70, 0);
+const QColor kSideChangeColor(170, 0, 255);
+const QColor kCommentColor(80, 150, 80);
+
+QString qstr(const QString& s) { return s; }
+QString qstr(const std::string& s) { return QString::fromStdString(s); }
+
+bool isTickBlock(const QStringList& lines)
 {
-    return turns < 0 ? QStringLiteral("永久") : QStringLiteral("剩余 %1 回合").arg(turns);
+    return !lines.isEmpty() && lines.first().trimmed().contains("tickStatuses");
 }
 
-QColor mixWithNormalText(const QColor& highlight, qreal alpha)
+QStringList tickBody(const QStringList& displayedLines)
 {
-    const QColor normal(31, 35, 40);
-    if (alpha < 0.0) {
-        alpha = 0.0;
+    if (!isTickBlock(displayedLines) || displayedLines.size() < 2) {
+        return displayedLines;
     }
-    if (alpha > 1.0) {
-        alpha = 1.0;
+
+    QStringList body;
+    for (int i = 1; i + 1 < displayedLines.size(); ++i) {
+        QString line = displayedLines[i];
+        if (line.startsWith("    ")) {
+            line.remove(0, 4);
+        }
+        body << line;
     }
-    return QColor(
-        static_cast<int>(normal.red()   * (1.0 - alpha) + highlight.red()   * alpha),
-        static_cast<int>(normal.green() * (1.0 - alpha) + highlight.green() * alpha),
-        static_cast<int>(normal.blue()  * (1.0 - alpha) + highlight.blue()  * alpha)
-    );
+
+    if (body.size() == 1 && body.first().trimmed().isEmpty()) {
+        body.clear();
+    }
+    return body;
+}
+
+QSet<int> bodyChangesToDisplayedLines(const QSet<int>& bodyChanges,
+                                      const QStringList& oldBody,
+                                      const QStringList& newBody)
+{
+    QSet<int> result;
+    for (int line : bodyChanges) {
+        if (line >= 0 && line < newBody.size()) {
+            result.insert(line + 1); // 0 行是 tickStatuses() {
+        }
+    }
+
+    // 函数体被清空时没有可见文字，改为高亮函数声明行。
+    if (result.isEmpty() && !oldBody.isEmpty() && newBody.isEmpty()) {
+        result.insert(0);
+    }
+    return result;
+}
+
+struct TickFlags {
+    bool player = false;
+    bool enemy = false;
+};
+
+TickFlags detectTickCall(const CodeCommandView& command)
+{
+    QString text = command.title + "\n" + command.lines.join("\n");
+    text = text.toLower();
+
+    const bool hasTick = text.contains("tickstate")
+                         || text.contains("tickstatus")
+                         || text.contains("tick_status");
+    if (!hasTick) {
+        return {};
+    }
+
+    TickFlags flags;
+    flags.player = text.contains("player");
+    flags.enemy = text.contains("enemy") || text.contains("boss");
+    return flags;
 }
 }
 
@@ -51,7 +103,6 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
     initCardButtons();
     initCodeEditors();
     startNewGame();
@@ -62,73 +113,99 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-// ==========================
+// ============================================================
 // 初始化
-// ==========================
+// ============================================================
 
 void MainWindow::initCardButtons()
 {
-    cardButtons.clear();
-    cardButtons.push_back(ui->cardButton1);
-    cardButtons.push_back(ui->cardButton2);
-    cardButtons.push_back(ui->cardButton3);
-    cardButtons.push_back(ui->cardButton4);
-    cardButtons.push_back(ui->cardButton5);
+    cardButtons = {
+        ui->cardButton1,
+        ui->cardButton2,
+        ui->cardButton3,
+        ui->cardButton4,
+        ui->cardButton5
+    };
 }
 
 void MainWindow::initCodeEditors()
 {
-    QVector<QPlainTextEdit*> editors = {
-        ui->codePlainTextEdit,
-        ui->playerTickCodePlainTextEdit,
-        ui->enemyTickCodePlainTextEdit
-    };
+    playerCode.editor = ui->playerTickCodePlainTextEdit;
+    enemyCode.editor = ui->enemyTickCodePlainTextEdit;
 
-    QFont codeFont("Consolas");
-    codeFont.setStyleHint(QFont::Monospace);
-    codeFont.setPointSize(10);
+    setupCodeEditor(ui->codePlainTextEdit);
+    setupCodeEditor(playerCode.editor);
+    setupCodeEditor(enemyCode.editor);
+}
 
-    for (QPlainTextEdit* editor : editors) {
-        editor->setReadOnly(true);
-        editor->setLineWrapMode(QPlainTextEdit::NoWrap);
-        editor->setFont(codeFont);
-        editor->setStyleSheet(
-            "QPlainTextEdit {"
-            "background-color: #F8F9FB;"
-            "color: #1F2328;"
-            "border: 1px solid #D0D7DE;"
-            "border-radius: 6px;"
-            "padding: 8px;"
-            "}"
-        );
+void MainWindow::setupCodeEditor(QPlainTextEdit* editor)
+{
+    if (!editor) {
+        return;
     }
+
+    editor->setReadOnly(true);
+    editor->setLineWrapMode(QPlainTextEdit::NoWrap);
+
+    QFont font("Consolas");
+    font.setStyleHint(QFont::Monospace);
+    font.setPointSize(11);
+    editor->setFont(font);
+
+    editor->setStyleSheet(
+        "QPlainTextEdit {"
+        "background-color: #F8F9FB;"
+        "color: #1F2328;"
+        "border: 1px solid #D0D7DE;"
+        "border-radius: 6px;"
+        "padding: 8px;"
+        "}"
+        );
+}
+
+void MainWindow::resetRuntimeState()
+{
+    ++executionToken;
+    ++sideHighlightToken;
+
+    logs.clear();
+    codeRanges.clear();
+    sideHighlightQueue.clear();
+
+    activeCodeIndex = -1;
+    controlsEnabled = false;
+    sideChangeHighlightActive = false;
+
+    playerCode.displayedLines.clear();
+    playerCode.bodyLines.clear();
+    playerCode.changedLines.clear();
+    playerCode.executingLines.clear();
+
+    enemyCode.displayedLines.clear();
+    enemyCode.bodyLines.clear();
+    enemyCode.changedLines.clear();
+    enemyCode.executingLines.clear();
 }
 
 void MainWindow::startNewGame()
 {
+    resetRuntimeState();
     gameManager = std::make_unique<GameManager>();
 
-    activeMainCodeIndex = -1;
-    lastPlayerTickLines.clear();
-    lastEnemyTickLines.clear();
-    changedPlayerTickLines.clear();
-    changedEnemyTickLines.clear();
-    functionChangeFadeAlpha = 0.0;
-
     clearLogs();
-    appendLog(QStringLiteral("游戏开始。"));
+    clearCodeHighlight();
+    clearSideChangeHighlight();
+    appendLog("游戏开始。");
 
     refreshUi();
-
+    refreshMainCodeEditor();
     beginTurnWithoutAutoDraw();
-    gameManager->prepareTurnCodeBlock();
-    refreshAllCodeEditors(false);
     startTurnDrawFive();
 }
 
-// ==========================
+// ============================================================
 // 日志
-// ==========================
+// ============================================================
 
 void MainWindow::appendLog(const QString& text)
 {
@@ -152,9 +229,9 @@ void MainWindow::refreshLogUi()
     ui->logTextEdit->setTextCursor(cursor);
 }
 
-// ==========================
+// ============================================================
 // 回合流程
-// ==========================
+// ============================================================
 
 void MainWindow::beginTurnWithoutAutoDraw()
 {
@@ -163,17 +240,19 @@ void MainWindow::beginTurnWithoutAutoDraw()
     }
 
     gameManager->beginTurnWithoutDraw();
+    gameManager->prepareTurnCodeBlock();
 
-    appendLog(QStringLiteral("第 %1 回合开始。").arg(gameManager->turnNumber));
-    appendLog(QStringLiteral("开始抽牌。"));
+    appendLog(QString("第 %1 回合开始。").arg(gameManager->turnNumber));
+    appendLog("本回合函数调用已写入代码块，开始抽牌。");
 
     refreshUi();
+    refreshMainCodeEditor();
 }
 
 void MainWindow::startTurnDrawFive()
 {
-    setCardButtonsEnabled(false);
-    drawNextCard(HAND_SLOT_COUNT);
+    setControlsEnabled(false);
+    drawNextCard(DEFAULT_DRAW_PER_TURN);
 }
 
 void MainWindow::drawNextCard(int remainingCount)
@@ -183,53 +262,226 @@ void MainWindow::drawNextCard(int remainingCount)
     }
 
     if (remainingCount <= 0) {
-        appendLog(QStringLiteral("抽牌阶段结束。"));
+        appendLog("抽牌阶段结束。请出牌，出牌只会写入代码块，暂不立即结算。");
         refreshUi();
-        setCardButtonsEnabled(true);
+        refreshMainCodeEditor();
+        setControlsEnabled(true);
         return;
     }
 
-    QVector<CardView> handView = gameManager->getHandView();
-    if (handView.size() >= HAND_SLOT_COUNT) {
-        appendLog(QStringLiteral("手牌已满，停止抽牌。"));
+    if (static_cast<int>(gameManager->getHandView().size()) >= cardButtons.size()) {
+        appendLog("手牌已满，停止抽牌。");
         refreshUi();
-        setCardButtonsEnabled(true);
+        refreshMainCodeEditor();
+        setControlsEnabled(true);
         return;
     }
 
     DrawResult result = gameManager->drawOneCard();
 
     if (result.needRecycle) {
-        appendLog(QStringLiteral("抽牌堆为空，弃牌堆放回抽牌堆。"));
-
+        appendLog("抽牌堆为空，弃牌堆放回抽牌堆。");
         recycleDiscardToDrawPileAnimation([this, remainingCount]() {
+            if (!gameManager) {
+                return;
+            }
             gameManager->recycleDiscardToDrawPile();
             refreshUi();
+            refreshMainCodeEditor();
+            setControlsEnabled(false);
             drawNextCard(remainingCount);
         });
         return;
     }
 
     if (!result.success) {
-        appendLog(QStringLiteral("没有牌可抽。"));
+        appendLog("没有牌可抽。");
         refreshUi();
-        setCardButtonsEnabled(true);
+        refreshMainCodeEditor();
+        setControlsEnabled(true);
         return;
     }
 
-    appendLog(QStringLiteral("抽到【%1】。").arg(result.card.name));
+    appendLog(QString("抽到【%1】。").arg(qstr(result.card.name)));
     refreshPileUi();
 
     drawOneCardAnimation(result.handIndex, result.card, [this, remainingCount]() {
         refreshUi();
-        setCardButtonsEnabled(false);
+        refreshMainCodeEditor();
+        setControlsEnabled(false);
         drawNextCard(remainingCount - 1);
     });
 }
 
-// ==========================
-// 抽牌动画
-// ==========================
+// ============================================================
+// 出牌 / 代码执行
+// ============================================================
+
+void MainWindow::playCardByIndex(int index)
+{
+    if (!gameManager || !controlsEnabled) {
+        return;
+    }
+
+    auto handView = gameManager->getHandView();
+    if (index < 0 || index >= static_cast<int>(handView.size())) {
+        return;
+    }
+
+    CardView card = handView[index];
+    PlayResult result = gameManager->playCardAsCode(index, firstAliveEnemy());
+
+    if (!result.success) {
+        appendLog(QString("无法写入代码：%1").arg(qstr(result.failReason)));
+        refreshUi();
+        refreshMainCodeEditor();
+        return;
+    }
+
+    appendLog(QString("玩家打出【%1】，对应代码已写入代码块。").arg(qstr(result.card.name)));
+
+    playCardToDiscardAnimation(index, card, [this]() {
+        refreshUi();
+        refreshMainCodeEditor();
+        if (gameManager && !gameManager->isBattleOver()) {
+            setControlsEnabled(true);
+        }
+    });
+}
+
+void MainWindow::on_endTurnButton_clicked()
+{
+    if (!gameManager || !controlsEnabled) {
+        return;
+    }
+
+    setControlsEnabled(false);
+    appendLog("玩家结束回合。剩余手牌进入弃牌堆。");
+
+    for (const CardView& card : gameManager->getHandView()) {
+        appendLog(QString("【%1】进入弃牌堆。").arg(qstr(card.name)));
+    }
+
+    gameManager->discardHand();
+    refreshUi();
+    refreshMainCodeEditor();
+
+    appendLog("开始按顺序执行代码块。");
+    executeCodeQueue();
+}
+
+void MainWindow::executeCodeQueue()
+{
+    executeNextCode(0, ++executionToken);
+}
+
+void MainWindow::executeNextCode(int index, int token)
+{
+    if (token != executionToken || !gameManager) {
+        return;
+    }
+
+    if (sideChangeHighlightActive || !sideHighlightQueue.isEmpty()) {
+        if (!sideChangeHighlightActive) {
+            startNextSideChangeHighlight();
+        }
+        QTimer::singleShot(SIDE_POLL_MS, this, [this, index, token]() {
+            executeNextCode(index, token);
+        });
+        return;
+    }
+
+    if (index >= gameManager->pendingCodeCount()) {
+        clearCodeHighlight();
+        TurnResult result = gameManager->finishTurnAfterCodeExecution();
+        refreshUi();
+        refreshMainCodeEditor();
+
+        if (result.gameOver || gameManager->isBattleOver()) {
+            showGameOverMessage();
+            return;
+        }
+
+        beginTurnWithoutAutoDraw();
+        startTurnDrawFive();
+        return;
+    }
+
+    highlightCodeBlock(index);
+
+    QTimer::singleShot(MAIN_EXEC_MS, this, [this, index, token]() {
+        if (token != executionToken || !gameManager) {
+            return;
+        }
+
+        gameManager->executePendingCode(index);
+        refreshUi();
+        refreshMainCodeEditor();
+
+        if (gameManager->isBattleOver()) {
+            clearCodeHighlight();
+            showGameOverMessage();
+            return;
+        }
+
+        QTimer::singleShot(MAIN_GAP_MS, this, [this, index, token]() {
+            executeNextCode(index + 1, token);
+        });
+    });
+}
+
+void MainWindow::showGameOverMessage()
+{
+    clearCodeHighlight();
+    refreshUi();
+    refreshMainCodeEditor();
+
+    QMessageBox::information(
+        this,
+        "游戏结束",
+        gameManager && gameManager->isPlayerWin() ? "胜利！" : "失败！"
+        );
+
+    setControlsEnabled(false);
+    ui->restartButton->setEnabled(true);
+    ui->helpButton->setEnabled(true);
+}
+
+// ============================================================
+// 动画
+// ============================================================
+
+void MainWindow::animateGhost(const QRect& startRect,
+                              const QRect& endRect,
+                              const QString& text,
+                              const QString& toolTip,
+                              int duration,
+                              QEasingCurve::Type easing,
+                              std::function<void()> onFinished)
+{
+    QPushButton* ghost = new QPushButton(ui->centralwidget);
+    ghost->setText(text);
+    ghost->setToolTip(toolTip);
+    ghost->setGeometry(startRect);
+    ghost->show();
+    ghost->raise();
+
+    QPropertyAnimation* animation = new QPropertyAnimation(ghost, "geometry");
+    animation->setDuration(duration);
+    animation->setStartValue(startRect);
+    animation->setEndValue(endRect);
+    animation->setEasingCurve(easing);
+
+    connect(animation, &QPropertyAnimation::finished, this, [ghost, animation, onFinished]() {
+        ghost->deleteLater();
+        animation->deleteLater();
+        if (onFinished) {
+            onFinished();
+        }
+    });
+
+    animation->start();
+}
 
 void MainWindow::drawOneCardAnimation(int handIndex,
                                       const CardView& card,
@@ -242,102 +494,13 @@ void MainWindow::drawOneCardAnimation(int handIndex,
         return;
     }
 
-    QRect startRect = geometryInCentral(ui->drawPileLabel);
-    QRect endRect = geometryInCentral(cardButtons[handIndex]);
-
-    QPushButton* ghostCard = new QPushButton(ui->centralwidget);
-    ghostCard->setText(QStringLiteral("%1\n费用：%2").arg(card.name).arg(card.cost));
-    ghostCard->setToolTip(card.description);
-    ghostCard->setGeometry(startRect);
-    ghostCard->show();
-    ghostCard->raise();
-
-    QPropertyAnimation* animation = new QPropertyAnimation(ghostCard, "geometry");
-    animation->setDuration(220);
-    animation->setStartValue(startRect);
-    animation->setEndValue(endRect);
-    animation->setEasingCurve(QEasingCurve::OutCubic);
-
-    connect(animation, &QPropertyAnimation::finished, this,
-            [ghostCard, animation, onFinished]() {
-        ghostCard->deleteLater();
-        animation->deleteLater();
-
-        if (onFinished) {
-            onFinished();
-        }
-    });
-
-    animation->start();
-}
-
-void MainWindow::recycleDiscardToDrawPileAnimation(std::function<void()> onFinished)
-{
-    QRect startRect = geometryInCentral(ui->discardPileLabel);
-    QRect endRect = geometryInCentral(ui->drawPileLabel);
-
-    QPushButton* ghostPile = new QPushButton(ui->centralwidget);
-    ghostPile->setText(QStringLiteral("洗牌"));
-    ghostPile->setGeometry(startRect);
-    ghostPile->show();
-    ghostPile->raise();
-
-    QPropertyAnimation* animation = new QPropertyAnimation(ghostPile, "geometry");
-    animation->setDuration(300);
-    animation->setStartValue(startRect);
-    animation->setEndValue(endRect);
-    animation->setEasingCurve(QEasingCurve::OutCubic);
-
-    connect(animation, &QPropertyAnimation::finished, this,
-            [ghostPile, animation, onFinished]() {
-        ghostPile->deleteLater();
-        animation->deleteLater();
-
-        if (onFinished) {
-            onFinished();
-        }
-    });
-
-    animation->start();
-}
-
-// ==========================
-// 出牌：写入代码块，不立即结算效果
-// ==========================
-
-void MainWindow::playCardByIndex(int index)
-{
-    if (!gameManager) {
-        return;
-    }
-
-    QVector<CardView> handView = gameManager->getHandView();
-
-    if (index < 0 || index >= handView.size()) {
-        return;
-    }
-
-    CardView card = handView[index];
-    Enemy* target = firstAliveEnemy();
-
-    PlayResult result = gameManager->playCardAsCode(index, target);
-
-    if (!result.success) {
-        appendLog(QStringLiteral("无法写入代码：%1").arg(result.failReason));
-        refreshUi();
-        return;
-    }
-
-    appendLog(QStringLiteral("写入代码：【%1】。").arg(result.card.name));
-
-    playCardToDiscardAnimation(index, card, [this]() {
-        refreshUi();
-        refreshAllCodeEditors(true);
-
-        if (gameManager && !gameManager->isBattleOver()) {
-            setCardButtonsEnabled(true);
-        }
-    });
+    animateGhost(geometryInCentral(ui->drawPileLabel),
+                 geometryInCentral(cardButtons[handIndex]),
+                 formatCardText(card),
+                 qstr(card.description),
+                 220,
+                 QEasingCurve::OutCubic,
+                 onFinished);
 }
 
 void MainWindow::playCardToDiscardAnimation(int index,
@@ -351,136 +514,32 @@ void MainWindow::playCardToDiscardAnimation(int index,
         return;
     }
 
-    setCardButtonsEnabled(false);
-
-    QRect startRect = geometryInCentral(cardButtons[index]);
-    QRect endRect = geometryInCentral(ui->discardPileLabel);
-
-    QPushButton* ghostCard = new QPushButton(ui->centralwidget);
-    ghostCard->setText(QStringLiteral("%1\n费用：%2").arg(card.name).arg(card.cost));
-    ghostCard->setToolTip(card.description);
-    ghostCard->setGeometry(startRect);
-    ghostCard->show();
-    ghostCard->raise();
-
+    setControlsEnabled(false);
     cardButtons[index]->hide();
 
-    QPropertyAnimation* animation = new QPropertyAnimation(ghostCard, "geometry");
-    animation->setDuration(250);
-    animation->setStartValue(startRect);
-    animation->setEndValue(endRect);
-    animation->setEasingCurve(QEasingCurve::InCubic);
-
-    connect(animation, &QPropertyAnimation::finished, this,
-            [this, ghostCard, animation, onFinished]() {
-        ghostCard->deleteLater();
-        animation->deleteLater();
-
-        if (onFinished) {
-            onFinished();
-        }
-    });
-
-    animation->start();
+    animateGhost(geometryInCentral(cardButtons[index]),
+                 geometryInCentral(ui->discardPileLabel),
+                 formatCardText(card),
+                 qstr(card.description),
+                 250,
+                 QEasingCurve::InCubic,
+                 onFinished);
 }
 
-// ==========================
-// 结束回合：逐段高亮执行代码
-// ==========================
-
-void MainWindow::on_endTurnButton_clicked()
+void MainWindow::recycleDiscardToDrawPileAnimation(std::function<void()> onFinished)
 {
-    if (!gameManager) {
-        return;
-    }
-
-    setCardButtonsEnabled(false);
-    appendLog(QStringLiteral("玩家结束回合，开始按顺序执行代码块。"));
-    executeCodeQueue();
+    animateGhost(geometryInCentral(ui->discardPileLabel),
+                 geometryInCentral(ui->drawPileLabel),
+                 "洗牌",
+                 "",
+                 300,
+                 QEasingCurve::OutCubic,
+                 onFinished);
 }
 
-void MainWindow::executeCodeQueue()
-{
-    refreshMainCodeEditor();
-    executeNextCode(0);
-}
-
-void MainWindow::executeNextCode(int index)
-{
-    if (!gameManager) {
-        return;
-    }
-
-    const int pendingCount = gameManager->pendingCodeCount();
-
-    if (index < pendingCount) {
-        highlightMainCodeBlock(index);
-
-        QTimer::singleShot(CODE_EXECUTE_DELAY_MS, this, [this, index]() {
-            gameManager->executePendingCode(index);
-            appendLog(QStringLiteral("执行代码段 %1。").arg(index + 1));
-            refreshUi();
-            refreshAllCodeEditors(true);
-
-            QTimer::singleShot(CODE_EXECUTE_INTERVAL_MS, this, [this, index]() {
-                executeNextCode(index + 1);
-            });
-        });
-        return;
-    }
-
-    if (index == pendingCount) {
-        highlightMainCodeBlock(index); // player.tickState();
-        QTimer::singleShot(CODE_EXECUTE_DELAY_MS, this, [this, index]() {
-            QTimer::singleShot(CODE_EXECUTE_INTERVAL_MS, this, [this, index]() {
-                executeNextCode(index + 1);
-            });
-        });
-        return;
-    }
-
-    if (index == pendingCount + 1) {
-        highlightMainCodeBlock(index); // boss.tickState();
-        QTimer::singleShot(CODE_EXECUTE_DELAY_MS, this, [this]() {
-            finishCodeExecutionAndEnterNextTurn();
-        });
-        return;
-    }
-
-    finishCodeExecutionAndEnterNextTurn();
-}
-
-void MainWindow::finishCodeExecutionAndEnterNextTurn()
-{
-    if (!gameManager) {
-        return;
-    }
-
-    TurnResult result = gameManager->finishTurnAfterCodeExecution();
-
-    clearMainCodeHighlight();
-    refreshUi();
-    refreshAllCodeEditors(true);
-
-    if (result.gameOver) {
-        QMessageBox::information(
-            this,
-            QStringLiteral("游戏结束"),
-            result.playerWin ? QStringLiteral("胜利！") : QStringLiteral("失败！")
-        );
-        setCardButtonsEnabled(false);
-        return;
-    }
-
-    beginTurnWithoutAutoDraw();
-    gameManager->prepareTurnCodeBlock();
-    refreshAllCodeEditors(false);
-    startTurnDrawFive();
-}
-
-// ==========================
+// ============================================================
 // 刷新界面
-// ==========================
+// ============================================================
 
 void MainWindow::refreshUi()
 {
@@ -490,136 +549,120 @@ void MainWindow::refreshUi()
 
     refreshPlayerUi();
     refreshEnemyUi();
-    refreshBossSkillUi();
-    refreshMinionUi();
     refreshPileUi();
     refreshHandUi();
+    refreshMinionUi();
+    refreshSideCodeEditors();
 }
 
 void MainWindow::refreshPlayerUi()
 {
     const Player& player = gameManager->player;
 
-    ui->playerHpLabel->setText(
-        QStringLiteral("玩家生命：%1/%2").arg(player.hp).arg(player.maxHp)
-    );
+    ui->playerHpLabel->setText(QString("玩家生命：%1/%2").arg(player.hp).arg(player.maxHp));
+    ui->playerEnergyLabel->setText(QString("玩家能量：%1/%2").arg(player.energy).arg(player.maxEnergy));
+    ui->playerShieldLabel->setText(QString("玩家护盾：%1").arg(player.shield));
 
-    ui->playerEnergyLabel->setText(
-        QStringLiteral("玩家能量：%1/%2").arg(player.energy).arg(player.maxEnergy)
-    );
-
-    ui->playerShieldLabel->setText(
-        QStringLiteral("玩家护盾：%1").arg(player.shield)
-    );
+    int strength = 0;
+    for (const Status& status : player.statuses) {
+        if (status.type == StatusType::STRENGTH) {
+            strength += status.value;
+        }
+    }
 
     ui->playerStrengthLabel->setText(
-        QStringLiteral("玩家力量：%1    实际攻击：%2")
-            .arg(statusValue(StatusType::STRENGTH))
+        QString("玩家力量：%1    实际攻击：%2")
+            .arg(strength)
             .arg(player.getEffectiveAttack())
-    );
+        );
 }
 
 void MainWindow::refreshEnemyUi()
 {
     Enemy* enemy = firstAliveEnemy();
 
-    if (enemy == nullptr) {
-        ui->enemyHpLabel->setText(QStringLiteral("Boss生命：无"));
+    if (!enemy) {
+        ui->enemyHpLabel->setText("敌人生命：无");
+        ui->bossSkillLabel->setText("Boss 技能：无");
+        ui->bossSkillLabel->setToolTip("");
         return;
     }
 
     ui->enemyHpLabel->setText(
-        QStringLiteral("Boss生命：%1/%2    护盾：%3")
+        QString("%1  生命：%2/%3")
+            .arg(QString::fromStdString(enemy->name))
             .arg(enemy->hp)
             .arg(enemy->maxHp)
-            .arg(enemy->shield)
-    );
-}
+        );
 
-void MainWindow::refreshBossSkillUi()
-{
-    Enemy* enemy = firstAliveEnemy();
-
-    if (!enemy) {
-        ui->bossSkillLabel->setText(QStringLiteral("Boss 技能：无"));
-        ui->bossSkillLabel->hide();
-        return;
-    }
-
-    ui->bossSkillLabel->setText(buildBossSkillText(enemy));
-    ui->bossSkillLabel->show();
-}
-
-void MainWindow::refreshMinionUi()
-{
-    QVector<QLabel*> labels = { ui->minionHpLabel1, ui->minionHpLabel2 };
-
-    for (QLabel* label : labels) {
-        label->clear();
-        label->hide();
-    }
-
-    if (!gameManager) {
-        return;
-    }
-
-    int displayed = 0;
-    for (const Minion& minion : gameManager->player.minions) {
-        if (!minion.isAlive()) {
-            continue;
-        }
-
-        if (displayed >= MINION_SLOT_COUNT) {
-            break;
-        }
-
-        labels[displayed]->setText(buildMinionInfoText(displayed + 1, minion));
-        labels[displayed]->show();
-        ++displayed;
-    }
+    // bossSkillLabel 只作为“技能卡片入口”显示。
+    // 具体技能说明放在 ToolTip 中，不再混入基础攻击、实际攻击、护盾等属性信息。
+    ui->bossSkillLabel->setText("Boss 技能");
+    ui->bossSkillLabel->setToolTip(buildBossSpecialSkillText(enemy));
 }
 
 void MainWindow::refreshPileUi()
 {
-    ui->drawPileLabel->setText(
-        QStringLiteral("抽牌堆\n%1").arg(gameManager->getDrawPileCount())
-    );
-
-    ui->discardPileLabel->setText(
-        QStringLiteral("弃牌堆\n%1").arg(gameManager->getDiscardPileCount())
-    );
+    ui->drawPileLabel->setText(QString("抽牌堆\n%1").arg(gameManager->getDrawPileCount()));
+    ui->discardPileLabel->setText(QString("弃牌堆\n%1").arg(gameManager->getDiscardPileCount()));
 }
 
 void MainWindow::refreshHandUi()
 {
-    QVector<CardView> handView = gameManager->getHandView();
+    auto handView = gameManager->getHandView();
 
     for (int i = 0; i < cardButtons.size(); ++i) {
-        if (i < handView.size() && !handView[i].name.isEmpty()) {
-            const CardView& card = handView[i];
+        const bool hasCard = i < static_cast<int>(handView.size())
+        && !qstr(handView[i].name).isEmpty();
 
-            cardButtons[i]->setText(
-                QStringLiteral("%1\n费用：%2").arg(card.name).arg(card.cost)
-            );
-            cardButtons[i]->setToolTip(card.description);
-            cardButtons[i]->show();
-            cardButtons[i]->setEnabled(true);
-        } else {
+        if (!hasCard) {
             cardButtons[i]->setText("");
             cardButtons[i]->hide();
             cardButtons[i]->setEnabled(false);
+            continue;
         }
+
+        const CardView& card = handView[i];
+        cardButtons[i]->setText(formatCardText(card));
+        cardButtons[i]->setToolTip(qstr(card.description));
+        cardButtons[i]->show();
+        cardButtons[i]->setEnabled(controlsEnabled && gameManager->player.energy >= card.cost);
     }
 }
 
-// ==========================
-// 代码块显示与高亮
-// ==========================
-
-void MainWindow::refreshAllCodeEditors(bool markFunctionChanges)
+void MainWindow::refreshMinionUi()
 {
-    refreshMainCodeEditor();
-    refreshFunctionCodeEditors(markFunctionChanges);
+    QLabel* labels[2] = { ui->minionHpLabel1, ui->minionHpLabel2 };
+    for (QLabel* label : labels) {
+        label->hide();
+        label->clear();
+    }
+
+    int slot = 0;
+    for (const Minion& minion : gameManager->player.minions) {
+        if (slot >= 2) {
+            break;
+        }
+        if (!minion.isAlive()) {
+            continue;
+        }
+
+        QStringList lines;
+        lines << QString("仆从%1：%2").arg(slot + 1).arg(QString::fromStdString(minion.name));
+        lines << QString("生命：%1/%2    攻击：%3")
+                     .arg(minion.hp)
+                     .arg(minion.maxHp)
+                     .arg(minion.getEffectiveAttack());
+
+        const QString statusSummary = buildStatusSummary(minion.statuses);
+        if (!statusSummary.isEmpty()) {
+            lines << "状态：" + statusSummary;
+        }
+
+        labels[slot]->setText(lines.join("\n"));
+        labels[slot]->show();
+        ++slot;
+    }
 }
 
 void MainWindow::refreshMainCodeEditor()
@@ -628,138 +671,200 @@ void MainWindow::refreshMainCodeEditor()
         return;
     }
 
-    QVector<CodeCommandView> commands = gameManager->getCodeCommandViews();
-
-    QStringList lines;
+    QStringList lines = { "{", "    // 请在此输入代码" };
     QVector<CodeRange> ranges;
+    int currentLine = 2;
 
-    lines << QStringLiteral("void BattleTurn::execute() {");
-    lines << QStringLiteral("    // 玩家出牌会被翻译成函数调用");
-
-    for (const CodeCommandView& command : commands) {
-        CodeRange range;
-        range.startLine = lines.size();
-        range.lineCount = std::max(1, static_cast<int>(command.lines.size()));
-
+    for (const CodeCommandView& command : gameManager->getCodeCommandViews()) {
         if (command.lines.isEmpty()) {
-            lines << QStringLiteral("    // %1").arg(command.title);
-        } else {
-            for (const QString& line : command.lines) {
-                lines << QStringLiteral("    %1").arg(line);
-            }
+            continue;
         }
 
-        ranges.push_back(range);
+        const TickFlags flags = detectTickCall(command);
+        ranges.push_back({ currentLine,
+                          static_cast<int>(command.lines.size()),
+                          flags.player,
+                          flags.enemy });
+
+        for (const QString& line : command.lines) {
+            lines << "    " + line;
+        }
+        currentLine += command.lines.size();
     }
 
-    CodeRange playerTickRange;
-    playerTickRange.startLine = lines.size();
-    playerTickRange.lineCount = 1;
-    lines << QStringLiteral("    player.tickState();");
-    ranges.push_back(playerTickRange);
-
-    CodeRange enemyTickRange;
-    enemyTickRange.startLine = lines.size();
-    enemyTickRange.lineCount = 1;
-    lines << QStringLiteral("    boss.tickState();");
-    ranges.push_back(enemyTickRange);
-
-    lines << QStringLiteral("}");
-
-    mainCodeRanges = ranges;
+    lines << "}";
+    codeRanges = ranges;
     ui->codePlainTextEdit->setPlainText(lines.join("\n"));
-    applyMainCodeTextStyles();
+    applyMainCodeStyle();
 }
 
-void MainWindow::refreshFunctionCodeEditors(bool markChanges)
+void MainWindow::refreshSideCodeEditors()
 {
-    QStringList playerLines = buildPlayerTickFunctionLines();
-    QStringList enemyLines = buildEnemyTickFunctionLines();
-
-    if (markChanges) {
-        markChangedFunctionLines(lastPlayerTickLines, playerLines, changedPlayerTickLines);
-        markChangedFunctionLines(lastEnemyTickLines, enemyLines, changedEnemyTickLines);
-    } else {
-        changedPlayerTickLines.clear();
-        changedEnemyTickLines.clear();
-    }
-
-    lastPlayerTickLines = playerLines;
-    lastEnemyTickLines = enemyLines;
-
-    ui->playerTickCodePlainTextEdit->setPlainText(playerLines.join("\n"));
-    ui->enemyTickCodePlainTextEdit->setPlainText(enemyLines.join("\n"));
-
-    if (markChanges && (!changedPlayerTickLines.isEmpty() || !changedEnemyTickLines.isEmpty())) {
-        startFunctionChangeFadeAnimation();
-    } else {
-        applyFunctionCodeTextStyles();
-    }
-}
-
-void MainWindow::highlightMainCodeBlock(int commandIndex)
-{
-    if (commandIndex < 0 || commandIndex >= mainCodeRanges.size()) {
-        clearMainCodeHighlight();
+    if (!gameManager) {
         return;
     }
 
-    activeMainCodeIndex = commandIndex;
-    applyMainCodeTextStyles();
+    updateSideCode(Side::Player, makeTickStatusesBlock(gameManager->getPlayerCodeLines()));
+    updateSideCode(Side::Enemy, makeTickStatusesBlock(gameManager->getEnemyCodeLines(firstAliveEnemy())));
+
+    if (!sideChangeHighlightActive) {
+        startNextSideChangeHighlight();
+    }
+
+    applySideCodeStyle(playerCode);
+    applySideCodeStyle(enemyCode);
 }
 
-void MainWindow::clearMainCodeHighlight()
+void MainWindow::updateSideCode(Side side, const QStringList& newDisplayedLines)
 {
-    activeMainCodeIndex = -1;
-    applyMainCodeTextStyles();
-}
+    SideCodeState& state = (side == Side::Player) ? playerCode : enemyCode;
+    if (!state.editor) {
+        return;
+    }
 
-void MainWindow::applyMainCodeTextStyles()
-{
-    QList<QTextEdit::ExtraSelection> selections;
+    const QStringList newBody = tickBody(newDisplayedLines);
+    const bool firstRender = state.displayedLines.isEmpty()
+                             && state.bodyLines.isEmpty()
+                             && state.editor->toPlainText().isEmpty();
+    const bool textChanged = state.displayedLines != newDisplayedLines;
 
-    if (activeMainCodeIndex >= 0 && activeMainCodeIndex < mainCodeRanges.size()) {
-        QTextCharFormat format;
-        format.setForeground(QColor(220, 90, 40));
-        format.setFontWeight(QFont::Bold);
+    QSet<int> changedLines;
+    if (textChanged && !firstRender) {
+        changedLines = bodyChangesToDisplayedLines(
+            changedBodyLines(state.bodyLines, newBody),
+            state.bodyLines,
+            newBody
+            );
 
-        const CodeRange& range = mainCodeRanges[activeMainCodeIndex];
-        for (int i = 0; i < range.lineCount; ++i) {
-            addFullLineSelection(ui->codePlainTextEdit, selections, range.startLine + i, format);
+        if (changedLines.isEmpty()) {
+            changedLines = allLineNumbers(state.editor);
         }
     }
 
-    addCommentTextStyles(ui->codePlainTextEdit, selections);
+    const QString newText = newDisplayedLines.join("\n");
+    if (textChanged || state.editor->toPlainText() != newText) {
+        state.displayedLines = newDisplayedLines;
+        state.bodyLines = newBody;
+        state.editor->setPlainText(newText);
+    }
+
+    if (textChanged && !changedLines.isEmpty()) {
+        enqueueSideChangeHighlight(side, changedLines);
+    }
+}
+
+// ============================================================
+// 代码高亮
+// ============================================================
+
+void MainWindow::highlightCodeBlock(int commandIndex)
+{
+    if (commandIndex < 0 || commandIndex >= codeRanges.size()) {
+        clearCodeHighlight();
+        return;
+    }
+
+    activeCodeIndex = commandIndex;
+    setSideExecutionHighlight(codeRanges[commandIndex]);
+    applyMainCodeStyle();
+}
+
+void MainWindow::clearCodeHighlight()
+{
+    activeCodeIndex = -1;
+    clearSideExecutionHighlight();
+    applyMainCodeStyle();
+}
+
+void MainWindow::applyMainCodeStyle()
+{
+    if (!ui || !ui->codePlainTextEdit) {
+        return;
+    }
+
+    QList<QTextEdit::ExtraSelection> selections;
+    QTextDocument* document = ui->codePlainTextEdit->document();
+
+    if (activeCodeIndex >= 0 && activeCodeIndex < codeRanges.size()) {
+        const CodeRange& range = codeRanges[activeCodeIndex];
+        for (int i = 0; i < range.lineCount; ++i) {
+            QTextBlock block = document->findBlockByNumber(range.startLine + i);
+            if (!block.isValid()) {
+                continue;
+            }
+
+            QTextEdit::ExtraSelection sel;
+            sel.cursor = QTextCursor(block);
+            sel.cursor.select(QTextCursor::LineUnderCursor);
+            sel.format.setForeground(kMainRunColor);
+            sel.format.setFontWeight(QFont::Bold);
+            selections << sel;
+        }
+    }
+
+    addCommentStyle(ui->codePlainTextEdit, selections);
     ui->codePlainTextEdit->setExtraSelections(selections);
 }
 
-void MainWindow::applyFunctionCodeTextStyles()
+void MainWindow::applySideCodeStyle(SideCodeState& state)
 {
-    QList<QTextEdit::ExtraSelection> playerSelections;
-    QList<QTextEdit::ExtraSelection> enemySelections;
-
-    if (functionChangeFadeAlpha > 0.0) {
-        QTextCharFormat changedFormat;
-        changedFormat.setForeground(mixWithNormalText(QColor(45, 120, 230), functionChangeFadeAlpha));
-        changedFormat.setFontWeight(QFont::Bold);
-
-        for (int line : changedPlayerTickLines) {
-            addFullLineSelection(ui->playerTickCodePlainTextEdit, playerSelections, line, changedFormat);
-        }
-        for (int line : changedEnemyTickLines) {
-            addFullLineSelection(ui->enemyTickCodePlainTextEdit, enemySelections, line, changedFormat);
-        }
+    QPlainTextEdit* editor = state.editor;
+    if (!editor) {
+        return;
     }
 
-    addCommentTextStyles(ui->playerTickCodePlainTextEdit, playerSelections);
-    addCommentTextStyles(ui->enemyTickCodePlainTextEdit, enemySelections);
+    const QString text = editor->toPlainText();
+    const int scrollValue = editor->verticalScrollBar() ? editor->verticalScrollBar()->value() : 0;
+    const int cursorPosition = editor->textCursor().position();
 
-    ui->playerTickCodePlainTextEdit->setExtraSelections(playerSelections);
-    ui->enemyTickCodePlainTextEdit->setExtraSelections(enemySelections);
+    // 重置旧字符格式，再重新叠加当前文字高亮。
+    editor->setPlainText(text);
+
+    QTextCursor cursor = editor->textCursor();
+    cursor.setPosition(qMin(cursorPosition, qMax(0, editor->document()->characterCount() - 1)));
+    editor->setTextCursor(cursor);
+    if (editor->verticalScrollBar()) {
+        editor->verticalScrollBar()->setValue(scrollValue);
+    }
+
+    applyLineTextStyle(editor, state.executingLines, kMainRunColor, true);
+    applyLineTextStyle(editor, state.changedLines, kSideChangeColor, true);
+
+    QList<QTextEdit::ExtraSelection> selections;
+    addCommentStyle(editor, selections);
+    editor->setExtraSelections(selections);
 }
 
-void MainWindow::addCommentTextStyles(QPlainTextEdit* editor,
-                                      QList<QTextEdit::ExtraSelection>& selections) const
+void MainWindow::applyLineTextStyle(QPlainTextEdit* editor,
+                                    const QSet<int>& lines,
+                                    const QColor& color,
+                                    bool bold)
+{
+    if (!editor || lines.isEmpty()) {
+        return;
+    }
+
+    QTextDocument* document = editor->document();
+    for (int lineNumber : lines) {
+        QTextBlock block = document->findBlockByNumber(lineNumber);
+        if (!block.isValid()) {
+            continue;
+        }
+
+        QTextCursor cursor(block);
+        cursor.select(QTextCursor::LineUnderCursor);
+
+        QTextCharFormat format;
+        format.setForeground(color);
+        if (bold) {
+            format.setFontWeight(QFont::Bold);
+        }
+        cursor.mergeCharFormat(format);
+    }
+}
+
+void MainWindow::addCommentStyle(QPlainTextEdit* editor,
+                                 QList<QTextEdit::ExtraSelection>& selections) const
 {
     if (!editor) {
         return;
@@ -768,220 +873,114 @@ void MainWindow::addCommentTextStyles(QPlainTextEdit* editor,
     QTextDocument* document = editor->document();
     for (QTextBlock block = document->begin(); block.isValid(); block = block.next()) {
         const QString text = block.text();
-        const int commentPos = text.indexOf(QStringLiteral("//"));
-        if (commentPos < 0) {
+        const int pos = text.indexOf("//");
+        if (pos < 0) {
             continue;
         }
 
+        QTextEdit::ExtraSelection sel;
         QTextCursor cursor(document);
-        cursor.setPosition(block.position() + commentPos);
+        cursor.setPosition(block.position() + pos);
         cursor.setPosition(block.position() + text.length(), QTextCursor::KeepAnchor);
-
-        QTextEdit::ExtraSelection selection;
-        selection.cursor = cursor;
-        selection.format.setForeground(QColor(80, 150, 80));
-        selection.format.setFontItalic(true);
-        selections.append(selection);
+        sel.cursor = cursor;
+        sel.format.setForeground(kCommentColor);
+        sel.format.setFontItalic(true);
+        selections << sel;
     }
 }
 
-void MainWindow::addFullLineSelection(QPlainTextEdit* editor,
-                                      QList<QTextEdit::ExtraSelection>& selections,
-                                      int line,
-                                      const QTextCharFormat& format) const
+void MainWindow::clearSideExecutionHighlight()
 {
-    if (!editor || line < 0) {
+    playerCode.executingLines.clear();
+    enemyCode.executingLines.clear();
+    applySideCodeStyle(playerCode);
+    applySideCodeStyle(enemyCode);
+}
+
+void MainWindow::setSideExecutionHighlight(const CodeRange& range)
+{
+    playerCode.executingLines.clear();
+    enemyCode.executingLines.clear();
+
+    if (!sideChangeHighlightActive) {
+        if (range.callsPlayerTick) {
+            playerCode.executingLines = allLineNumbers(playerCode.editor);
+        }
+        if (range.callsEnemyTick) {
+            enemyCode.executingLines = allLineNumbers(enemyCode.editor);
+        }
+    }
+
+    applySideCodeStyle(playerCode);
+    applySideCodeStyle(enemyCode);
+}
+
+void MainWindow::enqueueSideChangeHighlight(Side side, const QSet<int>& lines)
+{
+    if (!lines.isEmpty()) {
+        sideHighlightQueue.push_back({ side, lines });
+    }
+}
+
+void MainWindow::startNextSideChangeHighlight()
+{
+    if (sideChangeHighlightActive || sideHighlightQueue.isEmpty()) {
         return;
     }
 
-    QTextBlock block = editor->document()->findBlockByNumber(line);
-    if (!block.isValid()) {
-        return;
-    }
+    // 函数修改高亮期间，停止其它高亮。
+    activeCodeIndex = -1;
+    playerCode.executingLines.clear();
+    enemyCode.executingLines.clear();
+    playerCode.changedLines.clear();
+    enemyCode.changedLines.clear();
+    applyMainCodeStyle();
 
-    QTextEdit::ExtraSelection selection;
-    selection.cursor = QTextCursor(block);
-    selection.cursor.select(QTextCursor::LineUnderCursor);
-    selection.format = format;
-    selections.append(selection);
-}
+    const SideHighlightRequest request = sideHighlightQueue.takeFirst();
+    SideCodeState& target = (request.side == Side::Player) ? playerCode : enemyCode;
+    target.changedLines = request.lines;
 
-QStringList MainWindow::buildPlayerTickFunctionLines() const
-{
-    QStringList lines;
-    lines << QStringLiteral("void Player::tickState() {");
+    sideChangeHighlightActive = true;
+    const int token = ++sideHighlightToken;
 
-    if (!gameManager || gameManager->player.statuses.empty()) {
-        lines << QStringLiteral("    // 当前没有需要结算的状态");
-    } else {
-        for (const Status& status : gameManager->player.statuses) {
-            lines << QStringLiteral("    // %1").arg(statusSummary(status));
-            lines << QStringLiteral("    %1").arg(statusTickCodeLine(QStringLiteral("player"), status));
+    applySideCodeStyle(playerCode);
+    applySideCodeStyle(enemyCode);
+
+    QTimer::singleShot(SIDE_CHANGE_MS, this, [this, token]() {
+        if (token != sideHighlightToken) {
+            return;
         }
-    }
 
-    lines << QStringLiteral("}");
-    return lines;
-}
+        playerCode.changedLines.clear();
+        enemyCode.changedLines.clear();
+        sideChangeHighlightActive = false;
 
-QStringList MainWindow::buildEnemyTickFunctionLines() const
-{
-    QStringList lines;
-    lines << QStringLiteral("void Boss::tickState() {");
-
-    Enemy* enemy = firstAliveEnemy();
-    if (!enemy || enemy->statuses.empty()) {
-        lines << QStringLiteral("    // 当前没有需要结算的状态");
-    } else {
-        for (const Status& status : enemy->statuses) {
-            lines << QStringLiteral("    // %1").arg(statusSummary(status));
-            lines << QStringLiteral("    %1").arg(statusTickCodeLine(QStringLiteral("boss"), status));
-        }
-    }
-
-    lines << QStringLiteral("}");
-    return lines;
-}
-
-void MainWindow::markChangedFunctionLines(const QStringList& oldLines,
-                                          const QStringList& newLines,
-                                          QSet<int>& changedLines) const
-{
-    changedLines.clear();
-    const int maxCount = std::max(oldLines.size(), newLines.size());
-
-    for (int i = 0; i < maxCount; ++i) {
-        const QString oldLine = i < oldLines.size() ? oldLines[i] : QString();
-        const QString newLine = i < newLines.size() ? newLines[i] : QString();
-
-        if (oldLine != newLine && i < newLines.size()) {
-            changedLines.insert(i);
-        }
-    }
-}
-
-void MainWindow::startFunctionChangeFadeAnimation()
-{
-    if (functionChangeFadeAnimation) {
-        functionChangeFadeAnimation->stop();
-        functionChangeFadeAnimation->deleteLater();
-        functionChangeFadeAnimation = nullptr;
-    }
-
-    functionChangeFadeAnimation = new QVariantAnimation(this);
-    functionChangeFadeAnimation->setDuration(FUNCTION_FADE_DURATION_MS);
-    functionChangeFadeAnimation->setStartValue(1.0);
-    functionChangeFadeAnimation->setEndValue(0.0);
-    functionChangeFadeAnimation->setEasingCurve(QEasingCurve::OutCubic);
-
-    connect(functionChangeFadeAnimation, &QVariantAnimation::valueChanged, this,
-            [this](const QVariant& value) {
-        functionChangeFadeAlpha = value.toReal();
-        applyFunctionCodeTextStyles();
+        applySideCodeStyle(playerCode);
+        applySideCodeStyle(enemyCode);
+        startNextSideChangeHighlight();
     });
-
-    connect(functionChangeFadeAnimation, &QVariantAnimation::finished, this, [this]() {
-        functionChangeFadeAlpha = 0.0;
-        changedPlayerTickLines.clear();
-        changedEnemyTickLines.clear();
-        applyFunctionCodeTextStyles();
-
-        if (functionChangeFadeAnimation) {
-            functionChangeFadeAnimation->deleteLater();
-            functionChangeFadeAnimation = nullptr;
-        }
-    });
-
-    functionChangeFadeAnimation->start();
 }
 
-// ==========================
-// 信息文本
-// ==========================
-
-QString MainWindow::buildBossSkillText(Enemy* enemy) const
+void MainWindow::clearSideChangeHighlight()
 {
-    if (!enemy) {
-        return QStringLiteral("Boss 技能：无");
-    }
-
-    QString text;
-    const QString name = QString::fromStdString(enemy->name);
-
-    text += QStringLiteral("Boss：%1\n").arg(name);
-    text += QStringLiteral("基础攻击：%1    实际攻击：%2\n")
-                .arg(enemy->baseAttack)
-                .arg(enemy->getEffectiveAttack());
-
-    if (!enemy->statuses.empty()) {
-        QStringList statusTexts;
-        for (const Status& status : enemy->statuses) {
-            statusTexts << statusSummary(status);
-        }
-        text += QStringLiteral("状态：%1\n").arg(statusTexts.join(QStringLiteral("；")));
-    }
-
-    if (name.contains(QStringLiteral("Exception"), Qt::CaseInsensitive)
-        || name.contains(QStringLiteral("异常"))) {
-        text += QStringLiteral("技能：try-catch-finally 异常链；低血量时可能捕获致命伤害。");
-    } else if (name.contains(QStringLiteral("Template"), Qt::CaseInsensitive)
-               || name.contains(QStringLiteral("模板"))) {
-        text += QStringLiteral("技能：模板展开；可能重复调用攻击函数。");
-    } else if (name.contains(QStringLiteral("Fire"), Qt::CaseInsensitive)
-               || name.contains(QStringLiteral("火"))) {
-        text += QStringLiteral("技能：火焰攻击；可能施加 Burn 状态。");
-    } else if (name.contains(QStringLiteral("Frozen"), Qt::CaseInsensitive)
-               || name.contains(QStringLiteral("冰"))) {
-        text += QStringLiteral("技能：冰冻攻击；可能施加 Freeze 状态。");
-    } else if (name.contains(QStringLiteral("Caster"), Qt::CaseInsensitive)
-               || name.contains(QStringLiteral("法"))) {
-        text += QStringLiteral("技能：castState(player)；施加随机状态。 ");
-    } else {
-        text += QStringLiteral("技能：attack(player)；执行普通攻击函数。");
-    }
-
-    return text;
+    ++sideHighlightToken;
+    sideHighlightQueue.clear();
+    sideChangeHighlightActive = false;
+    playerCode.changedLines.clear();
+    enemyCode.changedLines.clear();
+    applySideCodeStyle(playerCode);
+    applySideCodeStyle(enemyCode);
 }
 
-QString MainWindow::buildMinionInfoText(int displayIndex, const Minion& minion) const
-{
-    return QStringLiteral("仆从%1：%2\n生命：%3/%4    护盾：%5    攻击：%6")
-        .arg(displayIndex)
-        .arg(QString::fromStdString(minion.name))
-        .arg(minion.hp)
-        .arg(minion.maxHp)
-        .arg(minion.shield)
-        .arg(minion.getEffectiveAttack());
-}
-
-// ==========================
+// ============================================================
 // 按钮槽函数
-// ==========================
+// ============================================================
 
-void MainWindow::on_cardButton1_clicked()
-{
-    playCardByIndex(0);
-}
-
-void MainWindow::on_cardButton2_clicked()
-{
-    playCardByIndex(1);
-}
-
-void MainWindow::on_cardButton3_clicked()
-{
-    playCardByIndex(2);
-}
-
-void MainWindow::on_cardButton4_clicked()
-{
-    playCardByIndex(3);
-}
-
-void MainWindow::on_cardButton5_clicked()
-{
-    playCardByIndex(4);
-}
+void MainWindow::on_cardButton1_clicked() { playCardByIndex(0); }
+void MainWindow::on_cardButton2_clicked() { playCardByIndex(1); }
+void MainWindow::on_cardButton3_clicked() { playCardByIndex(2); }
+void MainWindow::on_cardButton4_clicked() { playCardByIndex(3); }
+void MainWindow::on_cardButton5_clicked() { playCardByIndex(4); }
 
 void MainWindow::on_restartButton_clicked()
 {
@@ -991,22 +990,22 @@ void MainWindow::on_restartButton_clicked()
 void MainWindow::on_helpButton_clicked()
 {
     QString helpText =
-        QStringLiteral("CodeCraft：C++ 卡牌对战游戏\n\n")
-        + QStringLiteral("新的函数调用流程：\n")
-        + QStringLiteral("1. 玩家和 Boss 都被视作 C++ 对象。\n")
-        + QStringLiteral("2. 玩家出牌不会立即结算，而是写入中间代码块。\n")
-        + QStringLiteral("3. 点击结束回合后，代码块会按顺序逐段执行。\n")
-        + QStringLiteral("4. 当前执行的语句会用橙红色字体高亮。\n")
-        + QStringLiteral("5. player.tickState() 和 boss.tickState() 的实现显示在两侧代码块中。\n")
-        + QStringLiteral("6. 中毒、冰冻、力量等状态会改变 tickState() 函数内容，变化行会蓝色渐隐高亮。\n\n")
-        + QStringLiteral("目标：在玩家生命归零前击败 Boss。");
+        "CodeCraft：C++ 卡牌对战游戏\n\n"
+        "新的函数调用模式：\n"
+        "1. 玩家和怪物分别视作由不同类创建的对象。\n"
+        "2. 中间代码块展示本回合将依次执行的函数调用。\n"
+        "3. 玩家每打出一张牌，不会立刻结算效果，而是向代码块写入对应语句。\n"
+        "4. 玩家点击结束回合后，代码块会从上到下依次执行。\n"
+        "5. 当前执行语句使用橙红色文字高亮。\n"
+        "6. 左右两侧显示 tickStatuses() 的具体实现。\n"
+        "7. 状态或技能导致函数实现改变时，改变的代码行会用紫色文字高亮。";
 
-    QMessageBox::information(this, QStringLiteral("游戏说明"), helpText);
+    QMessageBox::information(this, "游戏说明", helpText);
 }
 
-// ==========================
+// ============================================================
 // 工具函数
-// ==========================
+// ============================================================
 
 QRect MainWindow::geometryInCentral(QWidget* widget) const
 {
@@ -1014,20 +1013,10 @@ QRect MainWindow::geometryInCentral(QWidget* widget) const
     return QRect(topLeft, widget->size());
 }
 
-void MainWindow::setCardButtonsEnabled(bool enabled)
+void MainWindow::setControlsEnabled(bool enabled)
 {
-    if (!gameManager) {
-        return;
-    }
-
-    QVector<CardView> handView = gameManager->getHandView();
-
-    for (int i = 0; i < cardButtons.size(); ++i) {
-        const bool hasCard = i < handView.size() && !handView[i].name.isEmpty();
-        const bool enoughEnergy = hasCard && gameManager->player.energy >= handView[i].cost;
-        cardButtons[i]->setEnabled(enabled && hasCard && enoughEnergy);
-    }
-
+    controlsEnabled = enabled;
+    refreshHandUi();
     ui->endTurnButton->setEnabled(enabled);
     ui->restartButton->setEnabled(enabled);
     ui->helpButton->setEnabled(enabled);
@@ -1044,113 +1033,164 @@ Enemy* MainWindow::firstAliveEnemy() const
             return enemyPtr.get();
         }
     }
-
     return nullptr;
 }
 
-QString MainWindow::statusTypeName(StatusType type) const
+QString MainWindow::formatCardText(const CardView& card) const
+{
+    return QString("%1\n费用：%2").arg(qstr(card.name)).arg(card.cost);
+}
+
+QString MainWindow::statusTypeText(StatusType type) const
 {
     switch (type) {
-    case StatusType::BURN:       return QStringLiteral("灼烧");
-    case StatusType::POISON:     return QStringLiteral("中毒");
-    case StatusType::FREEZE:     return QStringLiteral("冰冻");
-    case StatusType::STUN:       return QStringLiteral("眩晕");
-    case StatusType::WEAKEN:     return QStringLiteral("虚弱");
-    case StatusType::VULNERABLE: return QStringLiteral("易伤");
-    case StatusType::STRENGTH:   return QStringLiteral("力量");
-    case StatusType::SHIELD:     return QStringLiteral("护盾");
-    case StatusType::INVINCIBLE: return QStringLiteral("无敌");
-    case StatusType::REGEN:      return QStringLiteral("再生");
-    case StatusType::MARK:       return QStringLiteral("标记");
-    case StatusType::RAGE:       return QStringLiteral("怒气");
-    case StatusType::FORTIFY:    return QStringLiteral("固守");
-    case StatusType::CORRODE:    return QStringLiteral("腐蚀");
-    case StatusType::DODGE:      return QStringLiteral("闪避");
-    case StatusType::CHARGE:     return QStringLiteral("蓄力");
-    case StatusType::ECHO:       return QStringLiteral("回响");
-    default:                     return QStringLiteral("状态");
+    case StatusType::BURN:       return "灼烧";
+    case StatusType::POISON:     return "中毒";
+    case StatusType::FREEZE:     return "冰冻";
+    case StatusType::STUN:       return "眩晕";
+    case StatusType::WEAKEN:     return "虚弱";
+    case StatusType::VULNERABLE: return "易伤";
+    case StatusType::STRENGTH:   return "力量";
+    case StatusType::SHIELD:     return "护盾";
+    case StatusType::INVINCIBLE: return "无敌";
+    case StatusType::REGEN:      return "再生";
+    case StatusType::MARK:       return "标记";
+    case StatusType::RAGE:       return "怒气";
+    case StatusType::FORTIFY:    return "固守";
+    case StatusType::CORRODE:    return "腐蚀";
+    case StatusType::DODGE:      return "闪避";
+    case StatusType::CHARGE:     return "蓄力";
+    case StatusType::ECHO:       return "回响";
+    default:                     return "未知";
     }
 }
 
-QString MainWindow::statusVariableName(StatusType type) const
+QString MainWindow::buildStatusSummary(const std::vector<Status>& statuses) const
 {
-    switch (type) {
-    case StatusType::BURN:       return QStringLiteral("burn");
-    case StatusType::POISON:     return QStringLiteral("poison");
-    case StatusType::FREEZE:     return QStringLiteral("freeze");
-    case StatusType::STUN:       return QStringLiteral("stun");
-    case StatusType::WEAKEN:     return QStringLiteral("weaken");
-    case StatusType::VULNERABLE: return QStringLiteral("vulnerable");
-    case StatusType::STRENGTH:   return QStringLiteral("strength");
-    case StatusType::SHIELD:     return QStringLiteral("shieldState");
-    case StatusType::INVINCIBLE: return QStringLiteral("invincible");
-    case StatusType::REGEN:      return QStringLiteral("regen");
-    case StatusType::MARK:       return QStringLiteral("mark");
-    case StatusType::RAGE:       return QStringLiteral("rage");
-    case StatusType::FORTIFY:    return QStringLiteral("fortify");
-    case StatusType::CORRODE:    return QStringLiteral("corrode");
-    case StatusType::DODGE:      return QStringLiteral("dodge");
-    case StatusType::CHARGE:     return QStringLiteral("charge");
-    case StatusType::ECHO:       return QStringLiteral("echo");
-    default:                     return QStringLiteral("state");
+    QStringList parts;
+    for (const Status& status : statuses) {
+        QString turns = status.turnsRemaining < 0
+                            ? "永久"
+                            : QString("剩余%1回合").arg(status.turnsRemaining);
+        parts << QString("%1(%2，值%3)")
+                     .arg(statusTypeText(status.type))
+                     .arg(turns)
+                     .arg(status.value);
     }
+    return parts.join("，");
 }
 
-QString MainWindow::statusSummary(const Status& status) const
-{
-    return QStringLiteral("%1：数值 %2，%3")
-        .arg(statusTypeName(status.type))
-        .arg(status.value)
-        .arg(turnsText(status.turnsRemaining));
-}
 
-QString MainWindow::statusTickCodeLine(const QString& ownerName, const Status& status) const
+QString MainWindow::buildBossSpecialSkillText(Enemy* enemy) const
 {
-    const QString varName = statusVariableName(status.type);
-
-    switch (status.type) {
-    case StatusType::POISON:
-        return QStringLiteral("%1.takeDamage(%2, DamageType::POISON); %3.turnsRemaining--;")
-            .arg(ownerName).arg(status.value).arg(varName);
-    case StatusType::BURN:
-        return QStringLiteral("%1.takeDamage(%2, DamageType::FIRE); %3.turnsRemaining--;")
-            .arg(ownerName).arg(status.value).arg(varName);
-    case StatusType::REGEN:
-        return QStringLiteral("%1.heal(%2); %3.turnsRemaining--;")
-            .arg(ownerName).arg(status.value).arg(varName);
-    case StatusType::FREEZE:
-    case StatusType::STUN:
-        return QStringLiteral("%1.skipAction = true; %2.turnsRemaining--;")
-            .arg(ownerName).arg(varName);
-    case StatusType::STRENGTH:
-        return QStringLiteral("%1.attackBonus += %2; %3.turnsRemaining--;")
-            .arg(ownerName).arg(status.value).arg(varName);
-    case StatusType::WEAKEN:
-        return QStringLiteral("%1.attackPenalty += %2; %3.turnsRemaining--;")
-            .arg(ownerName).arg(status.value).arg(varName);
-    case StatusType::VULNERABLE:
-        return QStringLiteral("%1.damageTakenBonus += %2; %3.turnsRemaining--;")
-            .arg(ownerName).arg(status.value).arg(varName);
-    default:
-        return QStringLiteral("%1.updateStatus(%2, %3); %4.turnsRemaining--;")
-            .arg(ownerName)
-            .arg(static_cast<int>(status.type))
-            .arg(status.value)
-            .arg(varName);
-    }
-}
-
-int MainWindow::statusValue(StatusType type) const
-{
-    if (!gameManager) {
-        return 0;
+    if (!enemy) {
+        return QStringLiteral("无特殊技能");
     }
 
-    int total = 0;
-    for (const Status& status : gameManager->player.statuses) {
-        if (status.type == type) {
-            total += status.value;
+    const QString enemyName = QString::fromStdString(enemy->name);
+    QStringList lines;
+
+    lines << QStringLiteral("特殊技能：%1").arg(enemyName);
+
+    if (enemyName.contains(QStringLiteral("异常"))
+        || enemyName.contains(QStringLiteral("Exception"), Qt::CaseInsensitive)) {
+        lines << QStringLiteral("异常堆栈：受到伤害时累积异常计数，计数较高时可免疫部分负面状态。");
+        lines << QStringLiteral("try-catch：低生命时触发，捕获一次致命伤害并恢复生命，同时清除部分负面状态。");
+        lines << QStringLiteral("throw：异常计数较高时，消耗异常计数并造成放大伤害。");
+        lines << QStringLiteral("异常链：每隔数回合按异常计数进行连续攻击。");
+        lines << QStringLiteral("finally：死亡时可能触发最终伤害。");
+    }
+    else if (enemyName.contains(QStringLiteral("模板"))
+             || enemyName.contains(QStringLiteral("Template"), Qt::CaseInsensitive)) {
+        lines << QStringLiteral("阶段切换：生命降低到指定比例后进入新阶段，并获得更高护盾。");
+        lines << QStringLiteral("模式切换：在攻击模式和防御模式之间切换。");
+        lines << QStringLiteral("攻击模式：复制玩家部分攻击力作为自身力量后再攻击。");
+        lines << QStringLiteral("防御模式：获得护盾并恢复生命。");
+        lines << QStringLiteral("终极技：低生命阶段周期性释放强力攻击，并波及玩家仆从。");
+    }
+    else if (enemyName.contains(QStringLiteral("Caster"), Qt::CaseInsensitive)
+             || enemyName.contains(QStringLiteral("法师"))) {
+        lines << QStringLiteral("随机施法：在元素攻击、恢复、强化之间选择行动。");
+        lines << QStringLiteral("状态强化：低生命时偏向恢复，否则可能获得力量。");
+    }
+    else if (enemyName.contains(QStringLiteral("Fire"), Qt::CaseInsensitive)
+             || enemyName.contains(QStringLiteral("火"))) {
+        lines << QStringLiteral("火焰攻击：调用火焰类型伤害函数攻击玩家。");
+    }
+    else if (enemyName.contains(QStringLiteral("Frozen"), Qt::CaseInsensitive)
+             || enemyName.contains(QStringLiteral("冰"))) {
+        lines << QStringLiteral("冰冻攻击：调用冰冻类型伤害函数攻击玩家。");
+    }
+    else {
+        lines << QStringLiteral("无额外特殊技能。");
+    }
+
+    return lines.join(QStringLiteral("\n"));
+}
+
+QStringList MainWindow::toQStringList(const std::vector<std::string>& lines) const
+{
+    QStringList result;
+    result.reserve(static_cast<qsizetype>(lines.size()));
+    for (const std::string& line : lines) {
+        result << QString::fromStdString(line);
+    }
+    return result;
+}
+
+QStringList MainWindow::makeTickStatusesBlock(const std::vector<std::string>& bodyLines) const
+{
+    return makeTickStatusesBlock(toQStringList(bodyLines));
+}
+
+QStringList MainWindow::makeTickStatusesBlock(const QStringList& bodyLines) const
+{
+    if (!bodyLines.isEmpty() && bodyLines.first().trimmed().contains("tickStatuses")) {
+        return bodyLines;
+    }
+
+    QStringList result;
+    result << "tickStatuses() {";
+    if (bodyLines.isEmpty()) {
+        result << "";
+    } else {
+        for (const QString& line : bodyLines) {
+            result << "    " + line;
         }
     }
-    return total;
+    result << "}";
+    return result;
+}
+
+QSet<int> MainWindow::allLineNumbers(QPlainTextEdit* editor) const
+{
+    QSet<int> lines;
+    if (!editor || !editor->document()) {
+        return lines;
+    }
+
+    for (int i = 0; i < editor->document()->blockCount(); ++i) {
+        lines.insert(i);
+    }
+    return lines;
+}
+
+QSet<int> MainWindow::changedBodyLines(const QStringList& oldBody,
+                                       const QStringList& newBody) const
+{
+    QSet<int> changed;
+    if (oldBody == newBody) {
+        return changed;
+    }
+
+    const int count = std::max(static_cast<int>(oldBody.size()),
+                               static_cast<int>(newBody.size()));
+    for (int i = 0; i < count; ++i) {
+        const QString oldLine = i < oldBody.size() ? oldBody[i] : QString();
+        const QString newLine = i < newBody.size() ? newBody[i] : QString();
+        if (oldLine != newLine && i < newBody.size()) {
+            changed.insert(i);
+        }
+    }
+    return changed;
 }

@@ -77,7 +77,7 @@ public:
         playerShieldLabel->setGeometry(QRect(30, 90, 111, 20));
         enemyHpLabel = new QLabel(centralwidget);
         enemyHpLabel->setObjectName("enemyHpLabel");
-        enemyHpLabel->setGeometry(QRect(1150, 50, 101, 21));
+        enemyHpLabel->setGeometry(QRect(1060, 50, 161, 21));
         cardButton1 = new QPushButton(centralwidget);
         cardButton1->setObjectName("cardButton1");
         cardButton1->setGeometry(QRect(570, 850, 81, 101));
@@ -119,7 +119,7 @@ public:
         codePlainTextEdit->setReadOnly(true);
         bossSkillLabel = new QLabel(centralwidget);
         bossSkillLabel->setObjectName("bossSkillLabel");
-        bossSkillLabel->setGeometry(QRect(1150, 80, 81, 51));
+        bossSkillLabel->setGeometry(QRect(1060, 80, 81, 31));
         bossSkillLabel->setAlignment(Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop);
         bossSkillLabel->setWordWrap(true);
         minionHpLabel1 = new QLabel(centralwidget);

@@ -2,32 +2,26 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QVector>
+#include <QPlainTextEdit>
 #include <QPushButton>
-#include <QStringList>
 #include <QRect>
 #include <QSet>
-#include <QTextEdit>
+#include <QVector>
+#include <QStringList>
+#include <QEasingCurve>
 
 #include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "game_manager.h"
 
 QT_BEGIN_NAMESPACE
-namespace Ui {
-class MainWindow;
-}
+namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
 class Enemy;
-class QPlainTextEdit;
-class QVariantAnimation;
-
-struct CodeRange {
-    int startLine = 0;   // QPlainTextEdit 中的 0 基行号
-    int lineCount = 1;   // if / for 等结构需要整段高亮
-};
 
 class MainWindow : public QMainWindow
 {
@@ -43,110 +37,126 @@ private slots:
     void on_cardButton3_clicked();
     void on_cardButton4_clicked();
     void on_cardButton5_clicked();
-
     void on_endTurnButton_clicked();
     void on_restartButton_clicked();
     void on_helpButton_clicked();
 
 private:
-    Ui::MainWindow *ui;
+    enum class Side { Player, Enemy };
 
+    struct CodeRange {
+        int startLine = -1;
+        int lineCount = 0;
+        bool callsPlayerTick = false;
+        bool callsEnemyTick = false;
+    };
+
+    struct SideCodeState {
+        QPlainTextEdit* editor = nullptr;
+        QStringList displayedLines;
+        QStringList bodyLines;
+        QSet<int> changedLines;
+        QSet<int> executingLines;
+    };
+
+    struct SideHighlightRequest {
+        Side side = Side::Player;
+        QSet<int> lines;
+    };
+
+private:
+    Ui::MainWindow *ui = nullptr;
     std::unique_ptr<GameManager> gameManager;
 
     QStringList logs;
     QVector<QPushButton*> cardButtons;
+    QVector<CodeRange> codeRanges;
 
-    // 中间主代码块：每个 CodeCommandView 对应一个可整段执行/高亮的范围
-    QVector<CodeRange> mainCodeRanges;
-    int activeMainCodeIndex = -1;
+    SideCodeState playerCode;
+    SideCodeState enemyCode;
+    QVector<SideHighlightRequest> sideHighlightQueue;
 
-    // 两侧 tickState() 函数块：函数被改变时用蓝色渐隐高亮改变行
-    QStringList lastPlayerTickLines;
-    QStringList lastEnemyTickLines;
-    QSet<int> changedPlayerTickLines;
-    QSet<int> changedEnemyTickLines;
-    QVariantAnimation* functionChangeFadeAnimation = nullptr;
-    qreal functionChangeFadeAlpha = 0.0;
+    int activeCodeIndex = -1;
+    int executionToken = 0;
+    int sideHighlightToken = 0;
+    bool controlsEnabled = false;
+    bool sideChangeHighlightActive = false;
 
-    // 初始化
-    void startNewGame();
+    // 初始化 / 流程
     void initCardButtons();
     void initCodeEditors();
-
-    // 回合流程
+    void setupCodeEditor(QPlainTextEdit* editor);
+    void resetRuntimeState();
+    void startNewGame();
     void beginTurnWithoutAutoDraw();
     void startTurnDrawFive();
     void drawNextCard(int remainingCount);
-    void executeCodeQueue();
-    void executeNextCode(int index);
-    void finishCodeExecutionAndEnterNextTurn();
 
-    // 出牌流程
+    // 出牌 / 执行
     void playCardByIndex(int index);
+    void executeCodeQueue();
+    void executeNextCode(int index, int token);
+    void showGameOverMessage();
 
     // 动画
-    void drawOneCardAnimation(int handIndex,
-                              const CardView& card,
+    void animateGhost(const QRect& startRect,
+                      const QRect& endRect,
+                      const QString& text,
+                      const QString& toolTip,
+                      int duration,
+                      QEasingCurve::Type easing,
+                      std::function<void()> onFinished);
+    void drawOneCardAnimation(int handIndex, const CardView& card,
                               std::function<void()> onFinished);
-
-    void playCardToDiscardAnimation(int index,
-                                    const CardView& card,
+    void playCardToDiscardAnimation(int index, const CardView& card,
                                     std::function<void()> onFinished);
-
     void recycleDiscardToDrawPileAnimation(std::function<void()> onFinished);
 
-    // 刷新界面
+    // 刷新
     void refreshUi();
     void refreshPlayerUi();
     void refreshEnemyUi();
-    void refreshBossSkillUi();
-    void refreshMinionUi();
     void refreshPileUi();
     void refreshHandUi();
-
-    // 代码块显示与高亮
-    void refreshAllCodeEditors(bool markFunctionChanges);
+    void refreshMinionUi();
     void refreshMainCodeEditor();
-    void refreshFunctionCodeEditors(bool markChanges);
+    void refreshSideCodeEditors();
+    void updateSideCode(Side side, const QStringList& newDisplayedLines);
 
-    void highlightMainCodeBlock(int commandIndex);
-    void clearMainCodeHighlight();
+    // 代码高亮
+    void highlightCodeBlock(int commandIndex);
+    void clearCodeHighlight();
+    void applyMainCodeStyle();
+    void applySideCodeStyle(SideCodeState& state);
+    void applyLineTextStyle(QPlainTextEdit* editor, const QSet<int>& lines,
+                            const QColor& color, bool bold = true);
+    void addCommentStyle(QPlainTextEdit* editor,
+                         QList<QTextEdit::ExtraSelection>& selections) const;
 
-    void applyMainCodeTextStyles();
-    void applyFunctionCodeTextStyles();
-    void addCommentTextStyles(QPlainTextEdit* editor,
-                              QList<QTextEdit::ExtraSelection>& selections) const;
-    void addFullLineSelection(QPlainTextEdit* editor,
-                              QList<QTextEdit::ExtraSelection>& selections,
-                              int line,
-                              const QTextCharFormat& format) const;
+    void clearSideExecutionHighlight();
+    void setSideExecutionHighlight(const CodeRange& range);
+    void clearSideChangeHighlight();
+    void enqueueSideChangeHighlight(Side side, const QSet<int>& lines);
+    void startNextSideChangeHighlight();
 
-    QStringList buildPlayerTickFunctionLines() const;
-    QStringList buildEnemyTickFunctionLines() const;
-    void markChangedFunctionLines(const QStringList& oldLines,
-                                  const QStringList& newLines,
-                                  QSet<int>& changedLines) const;
-    void startFunctionChangeFadeAnimation();
-
-    // 信息文本
-    QString buildBossSkillText(Enemy* enemy) const;
-    QString buildMinionInfoText(int displayIndex, const Minion& minion) const;
-
-    // 日志
+    // 日志 / 工具
     void appendLog(const QString& text);
     void clearLogs();
     void refreshLogUi();
+    void setControlsEnabled(bool enabled);
 
-    // 工具
     QRect geometryInCentral(QWidget* widget) const;
-    void setCardButtonsEnabled(bool enabled);
     Enemy* firstAliveEnemy() const;
-
-    QString statusTypeName(StatusType type) const;
-    QString statusVariableName(StatusType type) const;
-    QString statusSummary(const Status& status) const;
-    QString statusTickCodeLine(const QString& ownerName, const Status& status) const;
-    int statusValue(StatusType type) const;
+    QString formatCardText(const CardView& card) const;
+    QString statusTypeText(StatusType type) const;
+    QString buildStatusSummary(const std::vector<Status>& statuses) const;
+    QString buildBossSpecialSkillText(Enemy* enemy) const;
+    QStringList toQStringList(const std::vector<std::string>& lines) const;
+    QStringList makeTickStatusesBlock(const QStringList& bodyLines) const;
+    QStringList makeTickStatusesBlock(const std::vector<std::string>& bodyLines) const;
+    QSet<int> allLineNumbers(QPlainTextEdit* editor) const;
+    QSet<int> changedBodyLines(const QStringList& oldBody,
+                               const QStringList& newBody) const;
 };
 
 #endif // MAINWINDOW_H

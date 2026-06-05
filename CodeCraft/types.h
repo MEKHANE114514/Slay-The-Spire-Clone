@@ -109,7 +109,7 @@ constexpr int DEFAULT_HAND_SIZE  = 5;
 constexpr int MAX_HAND_SIZE      = 10;
 constexpr int MAX_MINIONS        = 5;
 constexpr int MAX_ENEMIES        = 5;
-constexpr int DEFAULT_DRAW_PER_TURN = 1;
+constexpr int DEFAULT_DRAW_PER_TURN = 5;
 
 // 仆从基准属性
 constexpr int MINION_BASE_HP   = 20;
