@@ -22,7 +22,7 @@ MainWindow::~MainWindow()
 }
 
 // ==========================
-// 初始化
+// 初始�?
 // ==========================
 
 void MainWindow::initCardButtons()
@@ -41,17 +41,17 @@ void MainWindow::startNewGame()
     gameManager = std::make_unique<GameManager>();
 
     /*
-     * 重要：
-     * 这里暂时不调用 gameManager->startBattle()，
-     * 因为你们现在的 startBattle() 会调用 startTurn()，
-     * startTurn() 又会自动 drawCards()，这会绕过 Qt 抽牌动画。
+     * 重要�?
+     * 这里暂时不调�?gameManager->startBattle()�?
+     * 因为你们现在�?startBattle() 会调�?startTurn()�?
+     * startTurn() 又会自动 drawCards()，这会绕�?Qt 抽牌动画�?
      *
-     * 如果你们后面把“初始化敌人和牌组”的逻辑写进了 startBattle()，
-     * 建议拆出一个 setupBattleOnly()，只初始化敌人和牌组，不自动抽牌。
+     * 如果你们后面把“初始化敌人和牌组”的逻辑写进�?startBattle()�?
+     * 建议拆出一�?setupBattleOnly()，只初始化敌人和牌组，不自动抽牌�?
      */
 
     clearLogs();
-    appendLog("游戏开始。");
+    appendLog("游戏开始�?);
 
     refreshUi();
 
@@ -101,8 +101,8 @@ void MainWindow::beginTurnWithoutAutoDraw()
     gameManager->growMaxEnergy();
     gameManager->restoreEnergy();
 
-    appendLog(QString("第 %1 回合开始。").arg(gameManager->turnNumber));
-    appendLog("开始抽牌。");
+    appendLog(QString("�?%1 回合开始�?).arg(gameManager->turnNumber));
+    appendLog("开始抽牌�?);
 
     refreshUi();
 }
@@ -120,15 +120,15 @@ void MainWindow::drawNextCard(int remainingCount)
     }
 
     if (remainingCount <= 0) {
-        appendLog("抽牌阶段结束。");
+        appendLog("抽牌阶段结束�?);
         refreshUi();
         setCardButtonsEnabled(true);
         return;
     }
 
-    // UI 只有 5 个手牌槽，达到 5 张就停止抽牌
+    // UI 只有 5 个手牌槽，达�?5 张就停止抽牌
     if (static_cast<int>(gameManager->getHandView().size()) >= cardButtons.size()) {
-        appendLog("手牌已满，停止抽牌。");
+        appendLog("手牌已满，停止抽牌�?);
         refreshUi();
         setCardButtonsEnabled(true);
         return;
@@ -137,7 +137,7 @@ void MainWindow::drawNextCard(int remainingCount)
     DrawResult result = gameManager->drawOneCard();
 
     if (result.needRecycle) {
-        appendLog("抽牌堆为空，弃牌堆放回抽牌堆。");
+        appendLog("抽牌堆为空，弃牌堆放回抽牌堆�?);
 
         recycleDiscardToDrawPileAnimation([this, remainingCount]() {
             gameManager->recycleDiscardToDrawPile();
@@ -150,16 +150,16 @@ void MainWindow::drawNextCard(int remainingCount)
     }
 
     if (!result.success) {
-        appendLog("没有牌可抽。");
+        appendLog("没有牌可抽�?);
         refreshUi();
         setCardButtonsEnabled(true);
         return;
     }
 
-    appendLog(QString("抽到【%1】。").arg(toQString(result.card.name)));
+    appendLog(QString("抽到�?1】�?).arg(toQString(result.card.name)));
 
-    // 这里只刷新牌堆数量，不刷新手牌按钮。
-    // 否则真实手牌按钮会在动画前提前出现。
+    // 这里只刷新牌堆数量，不刷新手牌按钮�?
+    // 否则真实手牌按钮会在动画前提前出现�?
     refreshPileUi();
 
     drawOneCardAnimation(result.handIndex, result.card, [this, remainingCount]() {
@@ -187,7 +187,7 @@ void MainWindow::drawOneCardAnimation(int handIndex,
     QRect endRect = geometryInCentral(cardButtons[handIndex]);
 
     QPushButton* ghostCard = new QPushButton(ui->centralwidget);
-    ghostCard->setText(QString("%1\n费用：%2")
+    ghostCard->setText(QString("%1\n费用�?2")
                            .arg(toQString(card.name))
                            .arg(card.cost));
     ghostCard->setToolTip(toQString(card.description));
@@ -254,7 +254,7 @@ void MainWindow::playCardByIndex(int index)
         return;
     }
 
-    std::vector<CardView> handView = gameManager->getHandView();
+    QVector<CardView> handView = gameManager->getHandView();
 
     if (index < 0 || index >= static_cast<int>(handView.size())) {
         return;
@@ -267,12 +267,12 @@ void MainWindow::playCardByIndex(int index)
     PlayResult result = gameManager->playCard(index, target);
 
     if (!result.success) {
-        appendLog(QString("无法打出卡牌：%1").arg(toQString(result.failReason)));
+        appendLog(QString("无法打出卡牌�?1").arg(toQString(result.failReason)));
         refreshUi();
         return;
     }
 
-    appendLog(QString("玩家打出【%1】。").arg(toQString(result.card.name)));
+    appendLog(QString("玩家打出�?1】�?).arg(toQString(result.card.name)));
 
     playCardToDiscardAnimation(index, card, [this]() {
         refreshUi();
@@ -281,7 +281,7 @@ void MainWindow::playCardByIndex(int index)
             QMessageBox::information(
                 this,
                 "游戏结束",
-                gameManager->isPlayerWin() ? "胜利！" : "失败！"
+                gameManager->isPlayerWin() ? "胜利�? : "失败�?
                 );
 
             setCardButtonsEnabled(false);
@@ -306,7 +306,7 @@ void MainWindow::playCardToDiscardAnimation(int index,
     QRect endRect = geometryInCentral(ui->discardPileLabel);
 
     QPushButton* ghostCard = new QPushButton(ui->centralwidget);
-    ghostCard->setText(QString("%1\n费用：%2")
+    ghostCard->setText(QString("%1\n费用�?2")
                            .arg(toQString(card.name))
                            .arg(card.cost));
     ghostCard->setToolTip(toQString(card.description));
@@ -351,18 +351,18 @@ void MainWindow::on_endTurnButton_clicked()
 
     setCardButtonsEnabled(false);
 
-    appendLog("玩家结束回合。");
+    appendLog("玩家结束回合�?);
 
-    // 记录剩余手牌进入弃牌堆
-    std::vector<CardView> handView = gameManager->getHandView();
+    // 记录剩余手牌进入弃牌�?
+    QVector<CardView> handView = gameManager->getHandView();
     for (const CardView& card : handView) {
-        appendLog(QString("【%1】进入弃牌堆。").arg(toQString(card.name)));
+        appendLog(QString("�?1】进入弃牌堆�?).arg(toQString(card.name)));
     }
 
-    // 直接使用 GameManager 的公开接口，避免调用 endTurn() 自动 startTurn()
+    // 直接使用 GameManager 的公开接口，避免调�?endTurn() 自动 startTurn()
     gameManager->discardHand();
 
-    appendLog("怪物发动攻击。");
+    appendLog("怪物发动攻击�?);
 
     gameManager->battle.executeAttackPhase();
 
@@ -372,7 +372,7 @@ void MainWindow::on_endTurnButton_clicked()
         QMessageBox::information(
             this,
             "游戏结束",
-            gameManager->isPlayerWin() ? "胜利！" : "失败！"
+            gameManager->isPlayerWin() ? "胜利�? : "失败�?
             );
 
         setCardButtonsEnabled(false);
@@ -387,7 +387,7 @@ void MainWindow::on_endTurnButton_clicked()
         QMessageBox::information(
             this,
             "游戏结束",
-            gameManager->isPlayerWin() ? "胜利！" : "失败！"
+            gameManager->isPlayerWin() ? "胜利�? : "失败�?
             );
 
         setCardButtonsEnabled(false);
@@ -421,19 +421,19 @@ void MainWindow::refreshPlayerUi()
     const Player& player = gameManager->player;
 
     ui->playerHpLabel->setText(
-        QString("玩家生命：%1/%2")
+        QString("玩家生命�?1/%2")
             .arg(player.hp)
             .arg(player.maxHp)
         );
 
     ui->playerEnergyLabel->setText(
-        QString("玩家能量：%1/%2")
+        QString("玩家能量�?1/%2")
             .arg(player.energy)
             .arg(player.maxEnergy)
         );
 
     ui->playerShieldLabel->setText(
-        QString("玩家护盾：%1")
+        QString("玩家护盾�?1")
             .arg(player.shield)
         );
 }
@@ -446,7 +446,7 @@ void MainWindow::refreshEnemyUi()
         ui->enemyHpLabel->setText("敌人生命：无");
     } else {
         ui->enemyHpLabel->setText(
-            QString("敌人生命：%1/%2")
+            QString("敌人生命�?1/%2")
                 .arg(enemy->hp)
                 .arg(enemy->maxHp)
             );
@@ -472,14 +472,14 @@ void MainWindow::refreshPileUi()
 
 void MainWindow::refreshHandUi()
 {
-    std::vector<CardView> handView = gameManager->getHandView();
+    QVector<CardView> handView = gameManager->getHandView();
 
     for (int i = 0; i < cardButtons.size(); ++i) {
         if (i < static_cast<int>(handView.size()) && !handView[i].name.empty()) {
             const CardView& card = handView[i];
 
             cardButtons[i]->setText(
-                QString("%1\n费用：%2")
+                QString("%1\n费用�?2")
                     .arg(toQString(card.name))
                     .arg(card.cost)
                 );
@@ -496,7 +496,7 @@ void MainWindow::refreshHandUi()
 }
 
 // ==========================
-// 按钮槽函数
+// 按钮槽函�?
 // ==========================
 
 void MainWindow::on_cardButton1_clicked()
@@ -551,7 +551,7 @@ void MainWindow::on_helpButton_clicked()
         "模板牌：包装函数调用，例如三连击。\n\n"
 
         "当前版本说明：\n"
-        "本版本实现抽牌堆、手牌、弃牌堆和基础动画流程。";
+        "本版本实现抽牌堆、手牌、弃牌堆和基础动画流程�?;
 
     QMessageBox::information(this, "游戏说明", helpText);
 }
@@ -572,7 +572,7 @@ void MainWindow::setCardButtonsEnabled(bool enabled)
         return;
     }
 
-    std::vector<CardView> handView = gameManager->getHandView();
+    QVector<CardView> handView = gameManager->getHandView();
 
     for (int i = 0; i < cardButtons.size(); ++i) {
         bool hasCard =

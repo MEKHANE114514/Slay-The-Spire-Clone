@@ -32,16 +32,10 @@ public:
         return !player.isAlive() || allEnemiesDead();
     }
 
-    // ---- 阶段执行 ----
-    void executeAttackPhase();  // 仆从自动攻击 → 敌人依次行动
-    void executeEndPhase();     // 全场 tickStatuses
-
     // ---- UI 回调（Qt 绑定）----
-    std::function<void(Enemy*)>      onEnemyAdded;   // 敌人入场 → Qt 播放登场动画
-    std::function<void(int turn)>    onTurnStart;    // 回合开始
-    std::function<void(int turn)>    onTurnEnd;      // 回合结束
-    std::function<void()>            onVictory;      // 胜利
-    std::function<void()>            onDefeat;       // 失败
+    std::function<void(Enemy*)>      onEnemyAdded;
+    std::function<void(int turn)>    onTurnStart;
+    std::function<void(int turn)>    onTurnEnd;
 };
 
 #endif // BATTLE_H

@@ -6,6 +6,7 @@
 #include <memory>
 #include <QString>
 #include <QVector>
+#include <QStringList>
 #include "player.h"
 #include "battle.h"
 #include "cards.h"
@@ -20,6 +21,8 @@ struct CardView {
     QString name;
     QString description;
     int cost = 0;
+    CardType type = CardType::COMMAND;
+    FunctionTarget funcTarget = FunctionTarget::ATTACK;
     TargetMode targetMode = TargetMode::NONE;
 };
 
@@ -42,6 +45,12 @@ struct TurnResult {
     bool playerWin = false;
 };
 
+struct CodeCommandView {
+    QString title;
+    QStringList lines;
+    bool executed = false;
+};
+
 class GameManager {
 public:
     // ---- 关卡系统（静态，跨实例）----
@@ -61,8 +70,11 @@ public:
     GameManager();
 
     // ---- 回合流程 ----
-    void startTurn();
-    TurnResult endTurn();
+    void beginTurnWithoutDraw();
+    void prepareTurnCodeBlock();
+    void prepareAttackCodeBlock();
+    void prepareEndCodeBlock();
+    TurnResult finishTurnAfterCodeExecution();
     bool isBattleOver() const { return battle.isBattleOver(); }
     bool isPlayerWin() const { return battle.allEnemiesDead(); }
 
@@ -72,31 +84,43 @@ public:
     void spendEnergy(int cost);
 
     // ---- 牌组操作 ----
-    void drawCards(int count);            // 批量抽牌（内部调 drawOneCard）
     DrawResult drawOneCard();
     void recycleDiscardToDrawPile();
-    PlayResult playCard(int handIndex, Enemy* target = nullptr);
+    PlayResult playCardAsCode(int handIndex, Enemy* target = nullptr);
     void discardHand();
+
+    // ---- 代码执行模式 ----
+    QVector<CodeCommandView> getCodeCommandViews() const;
+    int pendingCodeCount() const;
+    void executePendingCode(int index);
 
     // ---- 查询（Qt 只读）----
     QVector<CardView> getHandView() const;
     int getDrawPileCount() const { return static_cast<int>(drawPile.size()); }
     int getDiscardPileCount() const { return static_cast<int>(discardPile.size()); }
-    QString getEnemyIntentText() const;
-
-    // ---- 战斗开始（以后填入具体怪物）----
-    void startBattle();
 
     // ---- Qt 回调 ----
-    std::function<void(int handIndex, CardView card)> onCardDrawn;   // 单张抽牌动画
-    std::function<void()> onCardsRecycled;  // 弃牌洗回动画
-    std::function<void()> onGameStart;
     std::function<void()> onGameEnd;
 
 private:
-    void initLevel();                      // 根据 currentLevel 生成敌人
-    void initDeck();                       // 初始化基础牌组
-    void finishBattle(bool playerWin);
+    void initLevel();
+    void initDeck();
+
+    // ---- 代码执行模式内部 ----
+    enum class CommandSource { PLAYER, MINION, ENEMY, END };
+
+    struct PendingCodeCommand {
+        QString title;
+        QStringList lines;
+        std::function<void()> effect;
+        bool executed = false;
+        CommandSource source = CommandSource::PLAYER;
+    };
+    QVector<PendingCodeCommand> pendingCommands;
+
+    QStringList buildCardCodeLines(const CardView& card) const;
+    QStringList buildEnemyCodeLines(Enemy* enemy) const;
+    void insertPlayerCommandBeforeEnemy(PendingCodeCommand cmd);
 };
 
 #endif // GAME_MANAGER_H
