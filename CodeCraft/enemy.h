@@ -1,6 +1,8 @@
 #ifndef ENEMY_H
 #define ENEMY_H
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 #include "types.h"
@@ -56,7 +58,6 @@ public:
     virtual void addStatus(Status s);
     bool hasStatus(StatusType t) const;
     void tickStatuses();
-    std::vector<std::string> getStatusesCode() const;  // 当前状态的中文代码行
     bool isDisabled() const {
         return hasStatus(StatusType::FREEZE) || hasStatus(StatusType::STUN);
     }
@@ -71,6 +72,9 @@ public:
     std::function<void(StatusType)>          onStatusRemoved;  // Buff/Debuff 消失
     std::function<void()>                    onDeath;          // 死亡 → 消失动画
     std::function<void(const EnemyIntent&)>  onIntentChanged;  // 意图切换 → UI 更新图标
+    
+    // ---- 敌人描述 ----
+    virtual std::vector<std::string> getDescription() const { return {"None"}; }
 
 protected:
     // 子类在 takeTurn() 中调用，设置本回合意图
@@ -89,18 +93,21 @@ class Goblin : public Enemy {
 public:
     Goblin() : Enemy("程序猿", 30, 6) {}
     void takeTurn(Player& player) override;
+    std::vector<std::string> getDescription() const override;
 };
 
 class FireGoblin : public Enemy {
 public:
     FireGoblin() : Enemy("炽热程序猿", 30, 6) {}
     void takeTurn(Player& player) override;
+    std::vector<std::string> getDescription() const override;
 };
 
 class FrozenGoblin : public Enemy {
 public:
     FrozenGoblin() : Enemy("冰霜程序猿", 30, 6) {}
     void takeTurn(Player& player) override;
+    std::vector<std::string> getDescription() const override;
 };
 
 // =============================================================
@@ -116,6 +123,7 @@ class Caster : public Enemy {
 public:
     Caster() : Enemy("魔法师", 50, 3) {}
     void takeTurn(Player& player) override;
+    std::vector<std::string> getDescription() const override;
 };
 
 // ============================================================
@@ -142,6 +150,7 @@ public:
     }
 
     void takeTurn(Player& player) override;
+    std::vector<std::string> getDescription() const override;
 
 private:
     Phase currentPhase;
@@ -187,6 +196,9 @@ public:
 
     // 重写死亡处理
     bool isAlive() const override;
+
+    // 获取描述
+    std::vector<std::string> getDescription() const override;
 
     // 公开访问器用于测试和 UI 显示
     int getExceptionCount() const { return exceptionCount; }
