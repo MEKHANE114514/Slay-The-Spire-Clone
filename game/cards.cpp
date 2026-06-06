@@ -543,7 +543,7 @@ void DoubleEffectCard::applyWrapper(Player& player, Enemy* target) {
 // ============================================================
 
 std::vector<std::string> CounterDamageCard::getCodeLines() const {
-    return {"enemy.takeDamage(0.5 * dmg); // Counter"};
+    return {"player.attack(enemy, 0.5 * dmg); // Counter"};
 }
 
 std::vector<std::string> DodgeCard::getCodeLines() const {
@@ -551,7 +551,7 @@ std::vector<std::string> DodgeCard::getCodeLines() const {
 }
 
 std::vector<std::string> ThornsCard::getCodeLines() const {
-    return {"enemy.takeDamage(0.3 * dmg);"};
+    return {"player.attack(enemy, 0.3 * dmg);"};
 }
 
 std::vector<std::string> RageCard::getCodeLines() const {
@@ -597,7 +597,7 @@ std::vector<std::string> RemainsMoveCard::getCodeLines() const {
 
 std::vector<std::string> ExplodeSacrificeCard::getCodeLines() const {
     return {
-        "enemy.takeDamage(minion.hp);",
+        "player.minion.attack(enemy, minion.hp);",
         "delete minion;"
     };
 }
@@ -628,11 +628,11 @@ std::vector<std::string> EmergencyEscapeCard::getCodeLines() const {
 }
 
 std::vector<std::string> RearguardEscapeCard::getCodeLines() const {
-    return {"if (!escape()) enemy.takeDamage(2 * dmg);"};
+    return {"if (!escape()) player.attack(enemy, 2 * player.baseAttack);"};
 }
 
 std::vector<std::string> PowerStrikeCard::getCodeLines() const {
-    return {"enemy.takeDamage(2 * dmg);"};
+    return {"player.attack(enemy, 2 * player.baseAttack);"};
 }
 
 std::vector<std::string> SweepCard::getCodeLines() const {
@@ -690,7 +690,7 @@ std::vector<std::string> ChainExplosionCard::getCodeLines() const {
     return {
         "int totalDmg = 0;",
         "for (auto& m : player.minions) totalDmg += m.hp;",
-        "enemy.takeDamage(totalDmg);",
+        "player.attack(enemy, totalDmg);",
         "player.minions.clear();"
     };
 }
@@ -1160,7 +1160,7 @@ void DefendReflectCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendReflectCard::getCodeLines() const {
     return {
-        "enemy.takeDamage(dmg / 3, TRUE);  // Reflect 33%"
+        "player.attack(enemy, dmg / 3);  // Reflect 33%"
     };
 }
 
@@ -1294,7 +1294,7 @@ void DefendThornsCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendThornsCard::getCodeLines() const {
     return {
-        "enemy.takeDamage(dmg / 4);  // Thorns"
+        "player.attack(enemy, dmg / 4);  // Thorns"
     };
 }
 
@@ -1455,7 +1455,7 @@ void SacrificeExplodeCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SacrificeExplodeCard::getCodeLines() const {
     return {
-        "enemy.takeDamage(minion.hp, FIRE);",
+        "player.minion.attack(enemy, minion.hp);",
         "delete minion;"
     };
 }
@@ -1550,6 +1550,6 @@ void EscapeRearguardCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> EscapeRearguardCard::getCodeLines() const {
     return {
-        "if (escape()) enemy.takeDamage(2 * player.atk);"
+        "if (escape()) player.attack(enemy, 2 * player.baseAttack);"
     };
 }
