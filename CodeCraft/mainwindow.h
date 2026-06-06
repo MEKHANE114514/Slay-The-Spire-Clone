@@ -135,6 +135,7 @@ private:
 
     void clearSideExecutionHighlight();
     void setSideExecutionHighlight(const CodeRange& range);
+    void syncSideExecutionHighlightWithActiveCode();
     void clearSideChangeHighlight();
     void enqueueSideChangeHighlight(Side side, const QSet<int>& lines);
     void startNextSideChangeHighlight();

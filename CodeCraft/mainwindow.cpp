@@ -185,6 +185,21 @@ void MainWindow::resetRuntimeState()
     enemyCode.bodyLines.clear();
     enemyCode.changedLines.clear();
     enemyCode.executingLines.clear();
+
+    // 重新开始时要把旧游戏留下的文本格式也清掉。
+    // 否则 refreshSideCodeEditors() 会把旧文本误判为“发生变化”，
+    // 导致点击重新开始后两侧代码块立刻出现函数修改高亮。
+    auto resetEditor = [](QPlainTextEdit* editor) {
+        if (!editor) {
+            return;
+        }
+        editor->clear();
+        editor->setExtraSelections({});
+    };
+
+    resetEditor(ui ? ui->codePlainTextEdit : nullptr);
+    resetEditor(playerCode.editor);
+    resetEditor(enemyCode.editor);
 }
 
 void MainWindow::startNewGame()
@@ -694,8 +709,14 @@ void MainWindow::refreshMainCodeEditor()
 
     lines << "}";
     codeRanges = ranges;
+
+    if (activeCodeIndex >= codeRanges.size()) {
+        activeCodeIndex = -1;
+    }
+
     ui->codePlainTextEdit->setPlainText(lines.join("\n"));
     applyMainCodeStyle();
+    syncSideExecutionHighlightWithActiveCode();
 }
 
 void MainWindow::refreshSideCodeEditors()
@@ -711,8 +732,9 @@ void MainWindow::refreshSideCodeEditors()
         startNextSideChangeHighlight();
     }
 
-    applySideCodeStyle(playerCode);
-    applySideCodeStyle(enemyCode);
+    // 两侧执行高亮只由当前主代码 activeCodeIndex 决定，避免旧的 executingLines 残留，
+    // 这可以修复左侧 tickStatuses() 偶尔一直保持橙色的问题。
+    syncSideExecutionHighlightWithActiveCode();
 }
 
 void MainWindow::updateSideCode(Side side, const QStringList& newDisplayedLines)
@@ -765,15 +787,15 @@ void MainWindow::highlightCodeBlock(int commandIndex)
     }
 
     activeCodeIndex = commandIndex;
-    setSideExecutionHighlight(codeRanges[commandIndex]);
     applyMainCodeStyle();
+    syncSideExecutionHighlightWithActiveCode();
 }
 
 void MainWindow::clearCodeHighlight()
 {
     activeCodeIndex = -1;
-    clearSideExecutionHighlight();
     applyMainCodeStyle();
+    syncSideExecutionHighlightWithActiveCode();
 }
 
 void MainWindow::applyMainCodeStyle()
@@ -915,6 +937,28 @@ void MainWindow::setSideExecutionHighlight(const CodeRange& range)
     applySideCodeStyle(enemyCode);
 }
 
+void MainWindow::syncSideExecutionHighlightWithActiveCode()
+{
+    playerCode.executingLines.clear();
+    enemyCode.executingLines.clear();
+
+    if (!sideChangeHighlightActive
+        && activeCodeIndex >= 0
+        && activeCodeIndex < codeRanges.size()) {
+        const CodeRange& range = codeRanges[activeCodeIndex];
+
+        if (range.callsPlayerTick) {
+            playerCode.executingLines = allLineNumbers(playerCode.editor);
+        }
+        if (range.callsEnemyTick) {
+            enemyCode.executingLines = allLineNumbers(enemyCode.editor);
+        }
+    }
+
+    applySideCodeStyle(playerCode);
+    applySideCodeStyle(enemyCode);
+}
+
 void MainWindow::enqueueSideChangeHighlight(Side side, const QSet<int>& lines)
 {
     if (!lines.isEmpty()) {
@@ -955,8 +999,7 @@ void MainWindow::startNextSideChangeHighlight()
         enemyCode.changedLines.clear();
         sideChangeHighlightActive = false;
 
-        applySideCodeStyle(playerCode);
-        applySideCodeStyle(enemyCode);
+        syncSideExecutionHighlightWithActiveCode();
         startNextSideChangeHighlight();
     });
 }
@@ -968,8 +1011,7 @@ void MainWindow::clearSideChangeHighlight()
     sideChangeHighlightActive = false;
     playerCode.changedLines.clear();
     enemyCode.changedLines.clear();
-    applySideCodeStyle(playerCode);
-    applySideCodeStyle(enemyCode);
+    syncSideExecutionHighlightWithActiveCode();
 }
 
 // ============================================================
@@ -1087,45 +1129,12 @@ QString MainWindow::buildBossSpecialSkillText(Enemy* enemy) const
         return QStringLiteral("无特殊技能");
     }
 
-    const QString enemyName = QString::fromStdString(enemy->name);
     QStringList lines;
-
-    lines << QStringLiteral("特殊技能：%1").arg(enemyName);
-
-    if (enemyName.contains(QStringLiteral("异常"))
-        || enemyName.contains(QStringLiteral("Exception"), Qt::CaseInsensitive)) {
-        lines << QStringLiteral("异常堆栈：受到伤害时累积异常计数，计数较高时可免疫部分负面状态。");
-        lines << QStringLiteral("try-catch：低生命时触发，捕获一次致命伤害并恢复生命，同时清除部分负面状态。");
-        lines << QStringLiteral("throw：异常计数较高时，消耗异常计数并造成放大伤害。");
-        lines << QStringLiteral("异常链：每隔数回合按异常计数进行连续攻击。");
-        lines << QStringLiteral("finally：死亡时可能触发最终伤害。");
-    }
-    else if (enemyName.contains(QStringLiteral("模板"))
-             || enemyName.contains(QStringLiteral("Template"), Qt::CaseInsensitive)) {
-        lines << QStringLiteral("阶段切换：生命降低到指定比例后进入新阶段，并获得更高护盾。");
-        lines << QStringLiteral("模式切换：在攻击模式和防御模式之间切换。");
-        lines << QStringLiteral("攻击模式：复制玩家部分攻击力作为自身力量后再攻击。");
-        lines << QStringLiteral("防御模式：获得护盾并恢复生命。");
-        lines << QStringLiteral("终极技：低生命阶段周期性释放强力攻击，并波及玩家仆从。");
-    }
-    else if (enemyName.contains(QStringLiteral("Caster"), Qt::CaseInsensitive)
-             || enemyName.contains(QStringLiteral("法师"))) {
-        lines << QStringLiteral("随机施法：在元素攻击、恢复、强化之间选择行动。");
-        lines << QStringLiteral("状态强化：低生命时偏向恢复，否则可能获得力量。");
-    }
-    else if (enemyName.contains(QStringLiteral("Fire"), Qt::CaseInsensitive)
-             || enemyName.contains(QStringLiteral("火"))) {
-        lines << QStringLiteral("火焰攻击：调用火焰类型伤害函数攻击玩家。");
-    }
-    else if (enemyName.contains(QStringLiteral("Frozen"), Qt::CaseInsensitive)
-             || enemyName.contains(QStringLiteral("冰"))) {
-        lines << QStringLiteral("冰冻攻击：调用冰冻类型伤害函数攻击玩家。");
-    }
-    else {
-        lines << QStringLiteral("无额外特殊技能。");
+    for (const std::string& line : enemy->getDescription()) {
+        lines << QString::fromStdString(line);
     }
 
-    return lines.join(QStringLiteral("\n"));
+    return lines.isEmpty() ? QStringLiteral("无特殊技能") : lines.join(QStringLiteral("\n"));
 }
 
 QStringList MainWindow::toQStringList(const std::vector<std::string>& lines) const
