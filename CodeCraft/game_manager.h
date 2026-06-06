@@ -74,6 +74,7 @@ public:
     void prepareEndCodeBlock();
     std::vector<std::string> getPlayerCodeLines() const;
     std::vector<std::string> getEnemyCodeLines(Enemy* enemy) const;
+    std::vector<std::string> getEnemyDescription() const;
     TurnResult finishTurnAfterCodeExecution();
     bool isBattleOver() const { return battle.isBattleOver(); }
     bool isPlayerWin() const { return battle.allEnemiesDead(); }
