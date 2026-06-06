@@ -18,7 +18,7 @@ class Enemy;  // 前向声明，attack() 需要
 class Player {
 public:
     // ===== 函数类型别名（using = 类型缩写，不是默认函数）=====
-    using AttackFunc      = std::function<void(Enemy&)>;
+    using AttackFunc      = std::function<void(Enemy&, std::function<int(int)> damageModifier)>;
     using TakeDamageFunc  = std::function<void(int, DamageType)>;
     using SummonFunc      = std::function<Minion()>;
     using CopySummonFunc  = std::function<Minion(const Minion&)>;
@@ -32,7 +32,7 @@ public:
            int maxEnergy = DEFAULT_MAX_ENERGY);
 
     // ===== 对外调用入口（永远不变，内部转发到 *_Impl）=====
-    void attack(Enemy& target);
+    void attack(Enemy& target, std::function<int(int)> damageModifier = nullptr);
     void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL);
     Minion summon();
     Minion copySummon(const Minion& original);

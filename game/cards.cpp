@@ -73,9 +73,12 @@ std::vector<std::string> TemplateCard::getCodeLines() const {
 
 void AttackEnhanceCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
-        int enhancedDmg = static_cast<int>(player.getEffectiveAttack() * 1.5);
-        enemy.takeDamage(enhancedDmg, DamageType::PHYSICAL);
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
+        auto enhancedMod = [mod](int atk) -> int {
+            int base = mod ? mod(atk) : atk;
+            return static_cast<int>(base * 1.5f);
+        };
+        oldAttack(enemy, enhancedMod);
     });
 }
 
@@ -85,9 +88,9 @@ std::vector<std::string> AttackEnhanceCard::getCodeLines() const {
 
 void VampireAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
         int oldHp = enemy.hp;
-        oldAttack(enemy);
+        oldAttack(enemy, mod);
         int damage = oldHp - enemy.hp;
         if (damage > 0) {
             int healAmount = static_cast<int>(damage * 0.3);
@@ -102,9 +105,9 @@ std::vector<std::string> VampireAttackCard::getCodeLines() const {
 
 void ComboAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
-        oldAttack(enemy);
-        int halfDmg = player.getEffectiveAttack() / 2;
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
+        oldAttack(enemy, mod);
+        int halfDmg = mod ? mod(player.getEffectiveAttack()) / 2 : player.getEffectiveAttack() / 2;
         enemy.takeDamage(halfDmg, DamageType::PHYSICAL);
     });
 }
@@ -119,13 +122,16 @@ std::vector<std::string> ComboAttackCard::getCodeLines() const {
 
 void CritAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
         bool isCrit = (rand() % 100) < 30;
         if (isCrit) {
-            int dmg = player.getEffectiveAttack() * 2;
-            enemy.takeDamage(dmg, DamageType::PHYSICAL);
+            auto critMod = [mod](int atk) -> int {
+                int base = mod ? mod(atk) : atk;
+                return base * 2;
+            };
+            oldAttack(enemy, critMod);
         } else {
-            oldAttack(enemy);
+            oldAttack(enemy, mod);
         }
     });
 }
@@ -139,8 +145,8 @@ std::vector<std::string> CritAttackCard::getCodeLines() const {
 
 void PoisonAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack](Enemy& enemy) {
-        oldAttack(enemy);
+    player.setAttackFunc([oldAttack](Enemy& enemy, std::function<int(int)> mod) {
+        oldAttack(enemy, mod);
         Status poison;
         poison.type = StatusType::POISON;
         poison.value = 3;
@@ -158,8 +164,8 @@ std::vector<std::string> PoisonAttackCard::getCodeLines() const {
 
 void BurnAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack](Enemy& enemy) {
-        oldAttack(enemy);
+    player.setAttackFunc([oldAttack](Enemy& enemy, std::function<int(int)> mod) {
+        oldAttack(enemy, mod);
         Status burn;
         burn.type = StatusType::BURN;
         burn.value = 5;
@@ -177,13 +183,16 @@ std::vector<std::string> BurnAttackCard::getCodeLines() const {
 
 void ExecuteAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
         float hpPercent = static_cast<float>(enemy.hp) / enemy.maxHp;
         if (hpPercent < 0.3f) {
-            int dmg = player.getEffectiveAttack() * 3;
-            enemy.takeDamage(dmg, DamageType::PHYSICAL);
+            auto execMod = [mod](int atk) -> int {
+                int base = mod ? mod(atk) : atk;
+                return base * 3;
+            };
+            oldAttack(enemy, execMod);
         } else {
-            oldAttack(enemy);
+            oldAttack(enemy, mod);
         }
     });
 }
@@ -197,10 +206,13 @@ std::vector<std::string> ExecuteAttackCard::getCodeLines() const {
 
 void SynergyAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
-        int bonusDmg = static_cast<int>(player.minions.size()) * 3;
-        int totalDmg = player.getEffectiveAttack() + bonusDmg;
-        enemy.takeDamage(totalDmg, DamageType::PHYSICAL);
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
+        auto synergyMod = [mod, &player](int atk) -> int {
+            int base = mod ? mod(atk) : atk;
+            int bonus = static_cast<int>(player.minions.size()) * 3;
+            return base + bonus;
+        };
+        oldAttack(enemy, synergyMod);
     });
 }
 
@@ -210,11 +222,14 @@ std::vector<std::string> SynergyAttackCard::getCodeLines() const {
 
 void BerserkerAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack, &player](Enemy& enemy) {
-        int hpLost = player.maxHp - player.hp;
-        int bonusDmg = (hpLost / 10) * 5;
-        int totalDmg = player.getEffectiveAttack() + bonusDmg;
-        enemy.takeDamage(totalDmg, DamageType::PHYSICAL);
+    player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
+        auto berserkMod = [mod, &player](int atk) -> int {
+            int base = mod ? mod(atk) : atk;
+            int hpLost = player.maxHp - player.hp;
+            int bonus = (hpLost / 10) * 5;
+            return base + bonus;
+        };
+        oldAttack(enemy, berserkMod);
     });
 }
 
@@ -224,8 +239,8 @@ std::vector<std::string> BerserkerAttackCard::getCodeLines() const {
 
 void MarkAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([oldAttack](Enemy& enemy) {
-        oldAttack(enemy);
+    player.setAttackFunc([oldAttack](Enemy& enemy, std::function<int(int)> mod) {
+        oldAttack(enemy, mod);
         Status mark;
         mark.type = StatusType::MARK;
         mark.value = 50;
@@ -454,16 +469,14 @@ void RearguardEscapeCard::play(Player& player, Enemy* target) {
 
 void PowerStrikeCard::play(Player& player, Enemy* target) {
     if (!target) return;
-    int damage = player.getEffectiveAttack() * 2;
-    target->takeDamage(damage, DamageType::PHYSICAL);
+    player.attack(*target, [](int atk) { return atk * 2; });
 }
 
 void SweepCard::play(Player& player, Enemy* target) {
     // 注意：需要战斗上下文来获取全体敌人
     // 这里简化为单体
     if (!target) return;
-    int damage = player.getEffectiveAttack() / 2;
-    target->takeDamage(damage, DamageType::PHYSICAL);
+    player.attack(*target, [](int atk) { return atk / 2; });
 }
 
 void DefendCard::play(Player& player, Enemy* target) {
@@ -740,8 +753,8 @@ std::vector<std::string> ConstTemplateCard::getCodeLines() const {
 // 攻击函数·暴击 (AttackCritCard from cards_full.h)
 void AttackCritCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int damage = player.getEffectiveAttack();
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         if (rand() % 100 < 30) {  // 30% 概率
             damage *= 2;
         }
@@ -759,8 +772,9 @@ std::vector<std::string> AttackCritCard::getCodeLines() const {
 // 攻击函数·溅射
 void AttackSplashCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::PHYSICAL);
         // TODO: 对相邻敌人造成 50% 伤害（目前单敌人版本暂不实现）
     });
 }
@@ -775,10 +789,11 @@ std::vector<std::string> AttackSplashCard::getCodeLines() const {
 // 攻击函数·破甲
 void AttackPierceCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
         int shieldPierce = enemy.shield / 2;
         enemy.shield -= shieldPierce;
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::PHYSICAL);
     });
 }
 
@@ -792,8 +807,9 @@ std::vector<std::string> AttackPierceCard::getCodeLines() const {
 // 攻击函数·毒击
 void AttackPoisonCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::PHYSICAL);
         Status poison;
         poison.type = StatusType::POISON;
         poison.value = 3;
@@ -812,8 +828,9 @@ std::vector<std::string> AttackPoisonCard::getCodeLines() const {
 // 攻击函数·灼烧
 void AttackBurnCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::FIRE);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::FIRE);
         Status burn;
         burn.type = StatusType::BURN;
         burn.value = 5;
@@ -832,8 +849,9 @@ std::vector<std::string> AttackBurnCard::getCodeLines() const {
 // 攻击函数·冰冻
 void AttackFreezeCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::ICE);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::ICE);
         if (rand() % 100 < 20) {  // 20% 概率
             Status frozen;
             frozen.type = StatusType::FREEZE;
@@ -854,8 +872,9 @@ std::vector<std::string> AttackFreezeCard::getCodeLines() const {
 // 攻击函数·雷霆
 void AttackLightningCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::LIGHTNING);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::LIGHTNING);
         // TODO: 连锁伤害到其他敌人
     });
 }
@@ -870,8 +889,9 @@ std::vector<std::string> AttackLightningCard::getCodeLines() const {
 // 攻击函数·阴影
 void AttackShadowCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::SHADOW);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::SHADOW);
     });
 }
 
@@ -884,8 +904,8 @@ std::vector<std::string> AttackShadowCard::getCodeLines() const {
 // 攻击函数·神圣
 void AttackHolyCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int damage = player.getEffectiveAttack();
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.takeDamage(damage, DamageType::HOLY);
         player.heal(damage / 2);  // 治疗 50%
     });
@@ -901,8 +921,8 @@ std::vector<std::string> AttackHolyCard::getCodeLines() const {
 // 攻击函数·回复
 void AttackHealCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int damage = player.getEffectiveAttack();
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.takeDamage(damage, DamageType::PHYSICAL);
         player.heal(damage / 3);
     });
@@ -918,8 +938,9 @@ std::vector<std::string> AttackHealCard::getCodeLines() const {
 // 攻击函数·虚弱
 void AttackWeakenCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::PHYSICAL);
         Status weak;
         weak.type = StatusType::WEAKEN;
         weak.value = 25;
@@ -938,8 +959,9 @@ std::vector<std::string> AttackWeakenCard::getCodeLines() const {
 // 攻击函数·眩晕
 void AttackStunCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::PHYSICAL);
         if (rand() % 100 < 15) {
             Status stunned;
             stunned.type = StatusType::STUN;
@@ -960,8 +982,8 @@ std::vector<std::string> AttackStunCard::getCodeLines() const {
 // 攻击函数·回响
 void AttackEchoCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int damage = player.getEffectiveAttack();
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.takeDamage(damage, DamageType::PHYSICAL);
         enemy.takeDamage(damage / 2, DamageType::PHYSICAL);  // 回响伤害
     });
@@ -977,10 +999,11 @@ std::vector<std::string> AttackEchoCard::getCodeLines() const {
 // 攻击函数·蓄力
 void AttackChargeCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
         static int chargeStacks = 0;
         chargeStacks++;
-        int damage = player.getEffectiveAttack() + chargeStacks * 5;
+        int base = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        int damage = base + chargeStacks * 5;
         enemy.takeDamage(damage, DamageType::PHYSICAL);
     });
 }
@@ -995,8 +1018,9 @@ std::vector<std::string> AttackChargeCard::getCodeLines() const {
 // 攻击函数·分裂
 void AttackSplitCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int splitDmg = player.getEffectiveAttack() / 2;
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int base = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        int splitDmg = base / 2;
         enemy.takeDamage(splitDmg, DamageType::PHYSICAL);
         enemy.takeDamage(splitDmg, DamageType::PHYSICAL);
     });
@@ -1012,9 +1036,10 @@ std::vector<std::string> AttackSplitCard::getCodeLines() const {
 // 攻击函数·风暴
 void AttackWindfuryCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         for (int i = 0; i < 2; i++) {
-            enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+            enemy.takeDamage(dmg, DamageType::PHYSICAL);
         }
     });
 }
@@ -1028,8 +1053,8 @@ std::vector<std::string> AttackWindfuryCard::getCodeLines() const {
 // 攻击函数·吸收
 void AttackAbsorbCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int damage = player.getEffectiveAttack();
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.takeDamage(damage, DamageType::SHADOW);
         player.shield += damage / 4;
     });
@@ -1045,9 +1070,9 @@ std::vector<std::string> AttackAbsorbCard::getCodeLines() const {
 // 攻击函数·精准
 void AttackPrecisionCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
         // 精准攻击：直接伤害HP，不考虑护盾
-        int damage = player.getEffectiveAttack();
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.hp -= damage;  // 绕过 takeDamage 的护盾计算
     });
 }
@@ -1061,9 +1086,10 @@ std::vector<std::string> AttackPrecisionCard::getCodeLines() const {
 // 攻击函数·协同
 void AttackSynergyCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int base = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         int bonus = player.minions.size() * 3;
-        enemy.takeDamage(player.getEffectiveAttack() + bonus, DamageType::PHYSICAL);
+        enemy.takeDamage(base + bonus, DamageType::PHYSICAL);
     });
 }
 
@@ -1076,8 +1102,9 @@ std::vector<std::string> AttackSynergyCard::getCodeLines() const {
 // 攻击函数·标记
 void AttackMarkCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        enemy.takeDamage(player.getEffectiveAttack(), DamageType::PHYSICAL);
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
+        enemy.takeDamage(dmg, DamageType::PHYSICAL);
         Status mark;
         mark.type = StatusType::MARK;
         mark.value = 50;
@@ -1096,8 +1123,8 @@ std::vector<std::string> AttackMarkCard::getCodeLines() const {
 // 攻击函数·处决
 void AttackExecuteCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
-        int damage = player.getEffectiveAttack();
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         if (enemy.hp < enemy.maxHp * 0.3) {
             damage *= 3;
         }
@@ -1115,9 +1142,10 @@ std::vector<std::string> AttackExecuteCard::getCodeLines() const {
 // 攻击函数·狂暴
 void AttackBerserkerCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy) {
+    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
+        int base = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         int bonus = (player.maxHp - player.hp) / 2;
-        enemy.takeDamage(player.getEffectiveAttack() + bonus, DamageType::PHYSICAL);
+        enemy.takeDamage(base + bonus, DamageType::PHYSICAL);
     });
 }
 
@@ -1542,7 +1570,7 @@ void EscapeRearguardCard::play(Player& player, Enemy* target) {
     player.setEscapeFunc([oldEscape, target, &player]() -> bool {
         bool success = oldEscape();
         if (success && target) {
-            target->takeDamage(player.getEffectiveAttack() * 2, DamageType::PHYSICAL);
+            player.attack(*target, [](int atk) { return atk * 2; });
         }
         return success;
     });
