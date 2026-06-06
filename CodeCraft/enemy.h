@@ -76,6 +76,9 @@ public:
     // ---- 敌人描述 ----
     virtual std::vector<std::string> getDescription() const { return {"None"}; }
 
+    // ---- 状态描述 ----
+    std::vector<std::string> getStatusesCode() const;
+
 protected:
     // 子类在 takeTurn() 中调用，设置本回合意图
     void setIntent(EnemyIntent::Type t, int val = 0) {
