@@ -1,7 +1,6 @@
 #include "enemy.h"
 #include "player.h"
 #include "battle.h"
-#include "game_text.h"   // statusName()
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
@@ -84,60 +83,6 @@ void Enemy::tickStatuses() {
     if (!isAlive() && onDeath)       onDeath();
 }
 
-std::vector<std::string> Enemy::getStatusesCode() const {
-    std::vector<std::string> lines;
-    for (const auto& s : statuses) {
-        std::string effect;
-        switch (s.type) {
-            case StatusType::BURN:
-                effect = "hp-=" + std::to_string(s.value);
-                break;
-            case StatusType::POISON:
-                effect = "hp-=" + std::to_string(s.value) + "(↑)";
-                break;
-            case StatusType::REGEN:
-                effect = "hp+=" + std::to_string(s.value);
-                break;
-            case StatusType::STRENGTH:
-                effect = "atk+=" + std::to_string(s.value);
-                break;
-            case StatusType::WEAKEN:
-                effect = "atk-=" + std::to_string(s.value);
-                break;
-            case StatusType::VULNERABLE:
-                effect = "dmgTaken+" + std::to_string(s.value) + "%";
-                break;
-            case StatusType::FREEZE:
-            case StatusType::STUN:
-                effect = "skip";
-                break;
-            case StatusType::FORTIFY:
-                effect = "onHit:shield+=" + std::to_string(s.value);
-                break;
-            case StatusType::RAGE:
-                effect = "onHit:atk+=" + std::to_string(s.value);
-                break;
-            case StatusType::DODGE:
-                effect = "dodge " + std::to_string(s.value) + "%";
-                break;
-            case StatusType::INVINCIBLE:
-                effect = "immune";
-                break;
-            case StatusType::MARK:
-                effect = "dmgTaken+" + std::to_string(s.value) + "%";
-                break;
-            default:
-                effect = "?";
-                break;
-        }
-        std::string turns = (s.turnsRemaining > 0)
-            ? std::to_string(s.turnsRemaining) + "回合"
-            : "永久";
-        lines.push_back(effect + " //" + statusName(s.type) + "，" + turns);
-    }
-    return lines;
-}
-
 // ============================================================
 // Goblin 实现
 // ============================================================
@@ -152,6 +97,8 @@ void Goblin::takeTurn(Player& player) {
     }
 }
 
+std::vector<std::string> Goblin::getDescription() const { return {"普通的程序猿，每回合造成 6 点物理伤害。"}; }
+
 void FireGoblin::takeTurn(Player& player) {
     // 设置意图：显示即将攻击
     setIntent(EnemyIntent::ATTACK, getEffectiveAttack());
@@ -162,6 +109,8 @@ void FireGoblin::takeTurn(Player& player) {
     }
 }
 
+std::vector<std::string> FireGoblin::getDescription() const { return {"内心火热的程序猿，每回合造成 6 点火属性伤害。"}; }
+
 void FrozenGoblin::takeTurn(Player& player) {
     // 设置意图：显示即将攻击
     setIntent(EnemyIntent::ATTACK, getEffectiveAttack());
@@ -171,6 +120,8 @@ void FrozenGoblin::takeTurn(Player& player) {
         player.takeDamage(getEffectiveAttack(), DamageType::ICE);
     }
 }
+
+std::vector<std::string> FrozenGoblin::getDescription() const { return {"内心冰冷的程序猿，每回合造成 6 点物理伤害。"}; }
 
 void Caster::takeTurn(Player& player) {
     int actionChoice = rand() % 2;
@@ -211,6 +162,16 @@ void Caster::takeTurn(Player& player) {
     }
 }
 
+std::vector<std::string> Caster::getDescription() const {
+    return {
+        "经过 30 年的修炼变成魔法师的程序猿。",
+        "每回合有 0.5 的概率进行一次随机属性的攻击，造成 3 点基础伤害",
+        "若不进行攻击，则会释放一次 ⌈魔法⌋：",
+        "   - 如果己方有单位血量低于最大血量的 1/3，则释放回复魔法，为全体提供两回合的再生",
+        "   - 否则释放强化魔法，为己方全体增加两回合的力量"
+    };
+}
+
 // ============================================================
 // TemplateKing（模板魔王）实现
 // ============================================================
@@ -232,6 +193,17 @@ void TemplateKing::checkPhaseTransition() {
         shield = 30 + static_cast<int>(currentPhase) * 20;
         if (onShieldChanged) onShieldChanged(shield, shield);
     }
+}
+
+std::vector<std::string> TemplateKing::getDescription() const {
+    return {
+        "上古时期就开始修炼的神秘程序猿，传说参与过传奇程序 ⌈猿神⌋ 的开发。",
+        "【多阶段机制】生命值降至 66% 和 33% 时进入新阶段，进入新阶段后恢复护盾",
+        "【模式切换】每 3 回合在 ⌈攻击模式⌋ 和 ⌈防御模式⌋ 之间切换",
+        "    -【攻击模式】复制玩家攻击力的 50% 作为两回合力量增益，然后进行一次基础伤害为 10 的攻击",
+        "    -【防御模式】每回合生成护盾，护盾量随阶段递增（一阶段 10 / 二阶段 15 / 三阶段 20），并回复少量生命值",
+        "【终结技】第三阶段时每 4 回合释放一次两倍攻击力的 AOE 攻击"
+    };
 }
 
 void TemplateKing::switchMode() {
@@ -382,6 +354,18 @@ void ExceptionLord::takeDamage(int dmg, DamageType dtype) {
     }
 
     if (!isAlive() && onDeath) onDeath();
+}
+
+std::vector<std::string> ExceptionLord::getDescription() const {
+    return {
+        "传说曾是程序猿神开发的程序，因为位置的原因陷入了崩坏。",
+        "每回合释放一次基础伤害为 8 的普通攻击，每次攻击/受击都会累计一次 ⌈异常计数⌋",
+        "  -【Throw 攻击】异常计数 >= 3 时，有 60% 概率消耗所有异常计数，造成 (1 + 异常计数) 倍伤害",
+        "每 5 回合释放一次 ⌈异常链⌋，⌈异常链⌋ 的攻击次数等于当前异常计数（最多 5 次）",
+        "【Try-Catch】生命值低于 25% 时激活保护，下一次致命伤害会被捕获，恢复至 30% 生命并清除负面状态",
+        "【状态免疫】异常计数 >= 5 时免疫所有负面状态",
+        "【Finally】死亡时对玩家造成 20 点暗影真实伤害"
+    };
 }
 
 void ExceptionLord::addStatus(Status s) {
