@@ -18,9 +18,11 @@ Player::Player(std::string playerName, int maxHp, int maxEnergy)
 // ============================================================
 void Player::initDefaultFunctions()
 {
-    // ---- 默认攻击：造成基础攻击力的伤害 ----
-    attackImpl = [this](Enemy& target) {
-        target.takeDamage(getEffectiveAttack(), DamageType::PHYSICAL);
+    // ---- 默认攻击：effectiveAtk 经 modifier 处理后造成伤害 ----
+    attackImpl = [this](Enemy& target, std::function<int(int)> modifier) {
+        int baseDmg = getEffectiveAttack();
+        int dmg = modifier ? modifier(baseDmg) : baseDmg;
+        if (dmg > 0) target.takeDamage(dmg, DamageType::PHYSICAL);
     };
 
     // ---- 默认受击：先扣护盾，再扣生命 ----
@@ -69,9 +71,9 @@ void Player::initDefaultFunctions()
 // 所有转发函数在值变化后触发 UI 回调
 // ============================================================
 
-void Player::attack(Enemy& target) {
+void Player::attack(Enemy& target, std::function<int(int)> damageModifier) {
     if (isDisabled()) return;
-    attackImpl(target);
+    attackImpl(target, std::move(damageModifier));
 }
 
 void Player::takeDamage(int dmg, DamageType type) {
