@@ -99,6 +99,7 @@ public:
     QVector<CardView> getHandView() const;
     int getDrawPileCount() const { return static_cast<int>(drawPile.size()); }
     int getDiscardPileCount() const { return static_cast<int>(discardPile.size()); }
+    std::string getEnemyIntentText() const;
 
     // ---- Qt 回调 ----
     std::function<void()> onGameEnd;

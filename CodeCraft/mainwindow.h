@@ -152,6 +152,7 @@ private:
     QString statusTypeText(StatusType type) const;
     QString buildStatusSummary(const std::vector<Status>& statuses) const;
     QString buildBossSpecialSkillText(Enemy* enemy) const;
+    QString toQString(const std::string& s) const;
     QStringList toQStringList(const std::vector<std::string>& lines) const;
     QStringList makeTickStatusesBlock(const QStringList& bodyLines) const;
     QStringList makeTickStatusesBlock(const std::vector<std::string>& bodyLines) const;

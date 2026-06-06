@@ -351,12 +351,30 @@ release/moc_mainwindow.cpp: ../../mainwindow.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/qlocale.h \
 		C:/Qt/6.11.1/mingw_64/include/QtGui/qguiapplication_platform.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtabwidget.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/QVector \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qvector.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QPlainTextEdit \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qplaintextedit.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtextedit.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractscrollarea.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qframe.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextdocument.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextoption.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextcursor.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextformat.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qpen.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qabstracttextdocumentlayout.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextlayout.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qglyphrun.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qrawfont.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qfontdatabase.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QPushButton \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qpushbutton.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractbutton.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QSet \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QVector \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qvector.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QStringList \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QEasingCurve \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qeasingcurve.h \
 		../../game_manager.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QString \
 		../../player.h \
@@ -595,12 +613,30 @@ release/main.o: ../../main.cpp ../../mainwindow.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/qlocale.h \
 		C:/Qt/6.11.1/mingw_64/include/QtGui/qguiapplication_platform.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtabwidget.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/QVector \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qvector.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QPlainTextEdit \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qplaintextedit.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtextedit.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractscrollarea.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qframe.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextdocument.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextoption.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextcursor.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextformat.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qpen.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qabstracttextdocumentlayout.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextlayout.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qglyphrun.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qrawfont.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qfontdatabase.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QPushButton \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qpushbutton.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractbutton.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QSet \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QVector \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qvector.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QStringList \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QEasingCurve \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qeasingcurve.h \
 		../../game_manager.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QString \
 		../../player.h \
@@ -819,12 +855,30 @@ release/mainwindow.o: ../../mainwindow.cpp ../../mainwindow.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/qlocale.h \
 		C:/Qt/6.11.1/mingw_64/include/QtGui/qguiapplication_platform.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtabwidget.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/QVector \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qvector.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QPlainTextEdit \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qplaintextedit.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtextedit.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractscrollarea.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qframe.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextdocument.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextoption.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextcursor.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextformat.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qpen.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qabstracttextdocumentlayout.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextlayout.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qglyphrun.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qrawfont.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qfontdatabase.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QPushButton \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qpushbutton.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractbutton.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QSet \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QVector \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qvector.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QStringList \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QEasingCurve \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qeasingcurve.h \
 		../../game_manager.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QString \
 		../../player.h \
@@ -834,37 +888,30 @@ release/mainwindow.o: ../../mainwindow.cpp ../../mainwindow.h \
 		../../enemy.h \
 		../../cards.h \
 		ui_mainwindow.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/QPropertyAnimation \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qpropertyanimation.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qvariantanimation.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qabstractanimation.h \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qeasingcurve.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/QColor \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/QFont \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QLabel \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qlabel.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/qpicture.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QMessageBox \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qmessagebox.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qdialog.h \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qdialogbuttonbox.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/QTextCursor \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextcursor.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextdocument.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextformat.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qpen.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextoption.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/QPropertyAnimation \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qpropertyanimation.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qvariantanimation.h \
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qabstractanimation.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QScrollBar \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qscrollbar.h \
+		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractslider.h \
 		C:/Qt/6.11.1/mingw_64/include/QtGui/QTextBlock \
 		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextobject.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qtextlayout.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qglyphrun.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qrawfont.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/qfontdatabase.h \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/QTextCharFormat \
+		C:/Qt/6.11.1/mingw_64/include/QtGui/QTextCursor \
 		C:/Qt/6.11.1/mingw_64/include/QtGui/QTextDocument \
 		C:/Qt/6.11.1/mingw_64/include/QtWidgets/QTextEdit \
-		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qtextedit.h \
-		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qabstractscrollarea.h \
-		C:/Qt/6.11.1/mingw_64/include/QtWidgets/qframe.h \
 		C:/Qt/6.11.1/mingw_64/include/QtCore/QTimer \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/qtimer.h \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/QColor \
-		C:/Qt/6.11.1/mingw_64/include/QtCore/QEasingCurve \
-		C:/Qt/6.11.1/mingw_64/include/QtGui/QFont
+		C:/Qt/6.11.1/mingw_64/include/QtCore/qtimer.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release\mainwindow.o ..\..\mainwindow.cpp
 
 release/game_manager.o: ../../../game/game_manager.cpp ../../game_manager.h \
@@ -976,6 +1023,7 @@ release/battle.o: ../../../game/battle.cpp ../../battle.h \
 
 release/cards.o: ../../../game/cards.cpp ../../cards.h \
 		../../types.h \
+		../../cards_full.h \
 		../../player.h \
 		../../minion.h \
 		../../enemy.h
@@ -985,7 +1033,8 @@ release/enemy.o: ../../../game/enemy.cpp ../../enemy.h \
 		../../types.h \
 		../../minion.h \
 		../../player.h \
-		../../battle.h
+		../../battle.h \
+		../../game_text.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release\enemy.o ..\..\..\game\enemy.cpp
 
 release/minion.o: ../../../game/minion.cpp ../../minion.h \
@@ -995,7 +1044,8 @@ release/minion.o: ../../../game/minion.cpp ../../minion.h \
 release/player.o: ../../../game/player.cpp ../../player.h \
 		../../types.h \
 		../../minion.h \
-		../../enemy.h
+		../../enemy.h \
+		../../game_text.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release\player.o ..\..\..\game\player.cpp
 
 release/qrc_qmake_qmake_qm_files.o: release/qrc_qmake_qmake_qm_files.cpp 

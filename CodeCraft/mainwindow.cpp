@@ -610,6 +610,10 @@ void MainWindow::refreshEnemyUi()
             .arg(enemy->maxHp)
         );
 
+    ui->enemyIntentLabel->setText(
+        toQString(gameManager->getEnemyIntentText())
+        );
+
     // bossSkillLabel 只作为“技能卡片入口”显示。
     // 具体技能说明放在 ToolTip 中，不再混入基础攻击、实际攻击、护盾等属性信息。
     ui->bossSkillLabel->setText("Boss 技能");
@@ -1135,6 +1139,11 @@ QString MainWindow::buildBossSpecialSkillText(Enemy* enemy) const
     }
 
     return lines.isEmpty() ? QStringLiteral("无特殊技能") : lines.join(QStringLiteral("\n"));
+}
+
+QString MainWindow::toQString(const std::string& s) const
+{
+    return QString::fromStdString(s);
 }
 
 QStringList MainWindow::toQStringList(const std::vector<std::string>& lines) const

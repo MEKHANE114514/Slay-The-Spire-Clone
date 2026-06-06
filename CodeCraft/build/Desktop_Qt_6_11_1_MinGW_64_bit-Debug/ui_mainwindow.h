@@ -49,6 +49,7 @@ public:
     QLabel *playerStrengthLabel;
     QPlainTextEdit *playerTickCodePlainTextEdit;
     QPlainTextEdit *enemyTickCodePlainTextEdit;
+    QLabel *enemyIntentLabel;
     QMenuBar *menubar;
     QStatusBar *statusbar;
 
@@ -77,7 +78,7 @@ public:
         playerShieldLabel->setGeometry(QRect(30, 90, 111, 20));
         enemyHpLabel = new QLabel(centralwidget);
         enemyHpLabel->setObjectName("enemyHpLabel");
-        enemyHpLabel->setGeometry(QRect(1060, 50, 161, 21));
+        enemyHpLabel->setGeometry(QRect(1040, 30, 161, 21));
         cardButton1 = new QPushButton(centralwidget);
         cardButton1->setObjectName("cardButton1");
         cardButton1->setGeometry(QRect(570, 850, 81, 101));
@@ -119,7 +120,7 @@ public:
         codePlainTextEdit->setReadOnly(true);
         bossSkillLabel = new QLabel(centralwidget);
         bossSkillLabel->setObjectName("bossSkillLabel");
-        bossSkillLabel->setGeometry(QRect(1060, 80, 81, 31));
+        bossSkillLabel->setGeometry(QRect(1040, 100, 81, 31));
         bossSkillLabel->setAlignment(Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop);
         bossSkillLabel->setWordWrap(true);
         minionHpLabel1 = new QLabel(centralwidget);
@@ -145,6 +146,9 @@ public:
         enemyTickCodePlainTextEdit->setGeometry(QRect(1030, 130, 261, 681));
         enemyTickCodePlainTextEdit->setLineWrapMode(QPlainTextEdit::LineWrapMode::NoWrap);
         enemyTickCodePlainTextEdit->setReadOnly(true);
+        enemyIntentLabel = new QLabel(centralwidget);
+        enemyIntentLabel->setObjectName("enemyIntentLabel");
+        enemyIntentLabel->setGeometry(QRect(1040, 65, 121, 21));
         MainWindow->setCentralWidget(centralwidget);
         menubar = new QMenuBar(MainWindow);
         menubar->setObjectName("menubar");
@@ -196,6 +200,7 @@ public:
         minionHpLabel1->setText(QCoreApplication::translate("MainWindow", "\344\273\206\344\273\2161", nullptr));
         minionHpLabel2->setText(QCoreApplication::translate("MainWindow", "\344\273\206\344\273\2162", nullptr));
         playerStrengthLabel->setText(QCoreApplication::translate("MainWindow", "\347\216\251\345\256\266\345\212\233\351\207\217\357\274\232", nullptr));
+        enemyIntentLabel->setText(QCoreApplication::translate("MainWindow", "\346\225\214\344\272\272\346\204\217\345\233\276\357\274\232", nullptr));
     } // retranslateUi
 
 };

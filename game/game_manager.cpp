@@ -315,6 +315,17 @@ QVector<CardView> GameManager::getHandView() const {
     return result;
 }
 
+std::string GameManager::getEnemyIntentText() const {
+    std::string text;
+    for (auto& e : battle.enemies) {
+        if (!text.empty()) text += "\n";
+        text += e->name + "：" + e->nextIntent.name();
+        if (e->nextIntent.value > 0)
+            text += " " + std::to_string(e->nextIntent.value);
+    }
+    return text.empty() ? "无敌人" : text;
+}
+
 // ============================================================
 // 代码执行模式
 // ============================================================
