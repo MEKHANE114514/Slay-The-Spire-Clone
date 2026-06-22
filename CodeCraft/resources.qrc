@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/battle_bg.png</file>
+        <file>images/player.png</file>
+        <file>images/enemy_boss.png</file>
+        <file>images/minion.png</file>
+        <file>images/draw_pile.png</file>
+        <file>images/discard_pile.png</file>
+        <file>images/energy.png</file>
+    </qresource>
+</RCC>

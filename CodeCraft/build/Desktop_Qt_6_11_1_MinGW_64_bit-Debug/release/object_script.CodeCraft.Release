@@ -6,5 +6,6 @@ release/cards.o
 release/enemy.o
 release/minion.o
 release/player.o
+release/qrc_resources.o
 release/qrc_qmake_qmake_qm_files.o
 release/moc_mainwindow.o

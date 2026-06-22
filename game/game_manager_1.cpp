@@ -6,25 +6,6 @@
 // 静态关卡变量定义
 int GameManager::currentLevel = 1;
 
-namespace {
-CardView makeCardViewFromCard(const Card* card)
-{
-    CardView view;
-    if (!card) {
-        return view;
-    }
-
-    view.name = QString::fromStdString(card->name);
-    view.description = QString::fromStdString(card->description);
-    view.cost = card->cost;
-    view.targetMode = card->targetMode;
-    for (const std::string& line : card->getCodeLines()) {
-        view.codeLines << QString::fromStdString(line);
-    }
-    return view;
-}
-}
-
 GameManager::GameManager()
     : battle(player)
 {
@@ -251,7 +232,9 @@ DrawResult GameManager::drawOneCard() {
     std::unique_ptr<Card> card = std::move(drawPile[idx]);
     drawPile.erase(drawPile.begin() + idx);
 
-    CardView view = makeCardViewFromCard(card.get());
+    CardView view{QString::fromStdString(card->name),
+                  QString::fromStdString(card->description),
+                  card->cost, card->targetMode};
     int handIndex = static_cast<int>(hand.size());
     hand.push_back(std::move(card));
 
@@ -282,7 +265,9 @@ PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
 
     spendEnergy(card->cost);
 
-    CardView view = makeCardViewFromCard(card);
+    CardView view{QString::fromStdString(card->name),
+                  QString::fromStdString(card->description),
+                  card->cost, card->targetMode};
 
     // 不立即执行，而是挂入代码队列
     Card* rawCard = card;
@@ -320,7 +305,9 @@ QVector<CardView> GameManager::getHandView() const {
     QVector<CardView> result;
     for (auto& card : hand) {
         if (card) {
-            result.push_back(makeCardViewFromCard(card.get()));
+            result.push_back({QString::fromStdString(card->name),
+                              QString::fromStdString(card->description),
+                              card->cost, card->targetMode});
         } else {
             result.push_back({});
         }

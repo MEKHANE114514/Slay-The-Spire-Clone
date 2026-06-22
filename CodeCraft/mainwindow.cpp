@@ -4,16 +4,27 @@
 #include <QColor>
 #include <QEasingCurve>
 #include <QFont>
+#include <QFrame>
 #include <QLabel>
+#include <QGraphicsDropShadowEffect>
+#include <QPainter>
+#include <QGraphicsOpacityEffect>
+#include <QHBoxLayout>
+#include <QParallelAnimationGroup>
+#include <QSequentialAnimationGroup>
 #include <QMessageBox>
+#include <QResizeEvent>
 #include <QPropertyAnimation>
+#include <QPixmap>
 #include <QScrollBar>
 #include <QTextBlock>
+#include <QTextBrowser>
 #include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
 #include <QTimer>
+#include <QVBoxLayout>
 
 #include <algorithm>
 
@@ -26,6 +37,22 @@ constexpr int SIDE_POLL_MS = 80;
 const QColor kMainRunColor(210, 70, 0);
 const QColor kSideChangeColor(170, 0, 255);
 const QColor kCommentColor(80, 150, 80);
+const QColor kDamageTextColor(255, 90, 80);
+const QColor kHealTextColor(90, 255, 150);
+const QColor kShieldTextColor(80, 210, 255);
+const QColor kPoisonTextColor(100, 255, 100);
+const QColor kPlayerGlowColor(80, 190, 255, 210);
+const QColor kEnemyGlowColor(185, 80, 255, 230);
+const QColor kMinionGlowColor(90, 220, 255, 190);
+constexpr int kBackgroundDimAlpha = 92;
+
+const QString kBattleBgPath   = QStringLiteral(":/images/battle_bg.png");
+const QString kPlayerPath     = QStringLiteral(":/images/player.png");
+const QString kEnemyPath      = QStringLiteral(":/images/enemy_boss.png");
+const QString kMinionPath     = QStringLiteral(":/images/minion.png");
+const QString kDrawPilePath   = QStringLiteral(":/images/draw_pile.png");
+const QString kDiscardPilePath= QStringLiteral(":/images/discard_pile.png");
+const QString kEnergyPath     = QStringLiteral(":/images/energy.png");
 
 QString qstr(const QString& s) { return s; }
 QString qstr(const std::string& s) { return QString::fromStdString(s); }
@@ -105,12 +132,51 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     initCardButtons();
     initCodeEditors();
+    initTheme();
+    initImageAssets();
+    initCharacterContrast();
+    initResourceContrast();
+    initOverlays();
     startNewGame();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+
+    if (ui && ui->battleBackgroundLabel) {
+        setScaledPixmap(ui->battleBackgroundLabel, kBattleBgPath, Qt::IgnoreAspectRatio);
+    }
+
+    positionOverlays();
+}
+
+void MainWindow::initOverlays()
+{
+    gameOverOverlay = nullptr;
+    helpOverlay = nullptr;
+}
+
+void MainWindow::positionOverlays()
+{
+    if (!ui || !ui->centralwidget) {
+        return;
+    }
+
+    const QRect rect = ui->centralwidget->rect();
+
+    if (gameOverOverlay) {
+        gameOverOverlay->setGeometry(rect);
+    }
+
+    if (helpOverlay) {
+        helpOverlay->setGeometry(rect);
+    }
 }
 
 // ============================================================
@@ -154,17 +220,294 @@ void MainWindow::setupCodeEditor(QPlainTextEdit* editor)
 
     editor->setStyleSheet(
         "QPlainTextEdit {"
-        "background-color: #F8F9FB;"
-        "color: #1F2328;"
-        "border: 1px solid #D0D7DE;"
-        "border-radius: 6px;"
+        "background-color: rgba(5, 10, 18, 210);"
+        "color: #D7F7FF;"
+        "border: 1px solid #1E6F86;"
+        "border-radius: 8px;"
         "padding: 8px;"
+        "selection-background-color: rgba(49, 189, 255, 90);"
         "}"
         );
 }
 
+void MainWindow::initTheme()
+{
+    setStyleSheet(
+        "QMainWindow {"
+        "background-color: #03070D;"
+        "}"
+        "QLabel {"
+        "color: #D7F7FF;"
+        "font-family: 'Microsoft YaHei UI', 'Segoe UI';"
+        "font-size: 13px;"
+        "}"
+        "QLabel#playerHpLabel, QLabel#playerEnergyLabel, QLabel#playerShieldLabel, "
+        "QLabel#playerStrengthLabel, QLabel#enemyHpLabel, QLabel#enemyIntentLabel, "
+        "QLabel#bossSkillLabel, QLabel#minionHpLabel1, QLabel#minionHpLabel2 {"
+        "background-color: rgba(4, 9, 18, 185);"
+        "border: 1px solid rgba(45, 198, 255, 150);"
+        "border-radius: 8px;"
+        "padding: 5px;"
+        "}"
+        "QLabel#drawPileLabel, QLabel#discardPileLabel {"
+        "background-color: rgba(6, 12, 24, 205);"
+        "border: 1px solid rgba(92, 231, 255, 175);"
+        "border-radius: 10px;"
+        "padding: 5px 8px;"
+        "font-size: 13px;"
+        "font-weight: 700;"
+        "}"
+        "QLabel#drawPileCountLabel {"
+        "background-color: rgba(8, 18, 34, 230);"
+        "border: 2px solid rgba(87, 230, 255, 220);"
+        "border-radius: 10px;"
+        "padding: 3px 8px;"
+        "font-size: 16px;"
+        "font-weight: 900;"
+        "color: #ECFFFF;"
+        "}"
+        "QLabel#discardPileCountLabel {"
+        "background-color: rgba(26, 16, 6, 230);"
+        "border: 2px solid rgba(255, 170, 55, 220);"
+        "border-radius: 10px;"
+        "padding: 3px 8px;"
+        "font-size: 16px;"
+        "font-weight: 900;"
+        "color: #FFF3D8;"
+        "}"
+        "QLabel#energyValueLabel {"
+        "background-color: rgba(8, 18, 34, 235);"
+        "border: 2px solid rgba(111, 234, 255, 230);"
+        "border-radius: 12px;"
+        "padding: 6px 10px;"
+        "font-size: 18px;"
+        "font-weight: 900;"
+        "color: #FFFFFF;"
+        "}"
+        "QPushButton {"
+        "background-color: rgba(10, 18, 30, 220);"
+        "color: #E8FBFF;"
+        "border: 1px solid #2DC6FF;"
+        "border-radius: 8px;"
+        "padding: 6px;"
+        "font-family: 'Microsoft YaHei UI', 'Segoe UI';"
+        "font-size: 13px;"
+        "font-weight: 600;"
+        "}"
+        "QPushButton:hover {"
+        "background-color: rgba(18, 48, 70, 230);"
+        "border: 1px solid #8BE9FF;"
+        "}"
+        "QPushButton:pressed {"
+        "background-color: rgba(41, 113, 140, 230);"
+        "}"
+        "QPushButton:disabled {"
+        "background-color: rgba(20, 20, 25, 140);"
+        "color: #667680;"
+        "border: 1px solid #34424C;"
+        "}"
+        "QLabel#bossSkillLabel {"
+        "background-color: rgba(8, 14, 28, 220);"
+        "border: 1px solid #B86CFF;"
+        "border-radius: 10px;"
+        "color: #E9D7FF;"
+        "font-weight: 800;"
+        "padding: 6px;"
+        "}"
+        "QLabel#bossSkillLabel:hover {"
+        "background-color: rgba(42, 20, 70, 235);"
+        "border: 1px solid #FFFFFF;"
+        "color: #FFFFFF;"
+        "}"
+        "QToolTip {"
+        "background-color: #07111C;"
+        "color: #F7FDFF;"
+        "border: 1px solid #6FEAFF;"
+        "border-radius: 8px;"
+        "padding: 8px;"
+        "font-family: 'Microsoft YaHei UI', 'Segoe UI';"
+        "font-size: 13px;"
+        "}"
+        "QTextEdit, QTextBrowser {"
+        "background-color: rgba(5, 10, 18, 205);"
+        "color: #C9F4FF;"
+        "border: 1px solid #1E6F86;"
+        "border-radius: 8px;"
+        "padding: 6px;"
+        "font-family: 'Consolas', 'Microsoft YaHei UI';"
+        "font-size: 12px;"
+        "}"
+    );
+
+    for (QPushButton* btn : cardButtons) {
+        if (!btn) {
+            continue;
+        }
+        btn->setMinimumHeight(104);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet(cardButtonStyle(QStringLiteral("#6FEAFF"), true));
+    }
+}
+
+void MainWindow::initImageAssets()
+{
+    QList<QLabel*> imageLabels = {
+        ui->battleBackgroundLabel,
+        ui->playerImageLabel,
+        ui->enemyImageLabel,
+        ui->minionImageLabel1,
+        ui->minionImageLabel2,
+        ui->drawPileIconLabel,
+        ui->discardPileIconLabel,
+        ui->energyIconLabel
+    };
+
+    for (QLabel* label : imageLabels) {
+        if (!label) {
+            continue;
+        }
+
+        label->setText("");
+        label->setFrameShape(QFrame::NoFrame);
+        label->setFrameShadow(QFrame::Plain);
+        label->setLineWidth(0);
+        label->setMidLineWidth(0);
+        label->setAutoFillBackground(false);
+        label->setAttribute(Qt::WA_TranslucentBackground, true);
+        label->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        label->setStyleSheet("QLabel { background: transparent; border: none; }");
+        label->setAlignment(Qt::AlignCenter);
+        label->setScaledContents(false);
+    }
+
+    setScaledPixmap(ui->battleBackgroundLabel, kBattleBgPath, Qt::IgnoreAspectRatio);
+    ui->battleBackgroundLabel->lower();
+
+    setScaledPixmap(ui->playerImageLabel, kPlayerPath);
+    setScaledPixmap(ui->enemyImageLabel, kEnemyPath);
+    setScaledPixmap(ui->minionImageLabel1, kMinionPath);
+    setScaledPixmap(ui->minionImageLabel2, kMinionPath);
+
+    setScaledPixmap(ui->drawPileIconLabel, kDrawPilePath);
+    setScaledPixmap(ui->discardPileIconLabel, kDiscardPilePath);
+    setScaledPixmap(ui->energyIconLabel, kEnergyPath);
+}
+
+
+void MainWindow::initCharacterContrast()
+{
+    applyActorImageStyle(ui->playerImageLabel, kPlayerGlowColor, 34);
+    applyActorImageStyle(ui->enemyImageLabel,  kEnemyGlowColor,  44);
+    applyActorImageStyle(ui->minionImageLabel1, kMinionGlowColor, 24);
+    applyActorImageStyle(ui->minionImageLabel2, kMinionGlowColor, 24);
+
+    // 图标类控件保持透明，不加大面积底板。
+    for (QLabel* label : { ui->drawPileIconLabel, ui->discardPileIconLabel, ui->energyIconLabel }) {
+        if (!label) {
+            continue;
+        }
+        label->setStyleSheet("QLabel { background: transparent; border: none; }");
+    }
+}
+
+void MainWindow::initResourceContrast()
+{
+    applyResourceIconStyle(ui->drawPileIconLabel, QColor(72, 222, 255, 220), 22, false);
+    applyResourceIconStyle(ui->discardPileIconLabel, QColor(255, 165, 60, 210), 20, false);
+    applyResourceIconStyle(ui->energyIconLabel, QColor(120, 235, 255, 235), 28, true);
+
+    applyResourceCountStyle(ui->drawPileCountLabel, QColor(72, 222, 255, 220));
+    applyResourceCountStyle(ui->discardPileCountLabel, QColor(255, 165, 60, 220));
+    applyResourceCountStyle(ui->energyValueLabel, QColor(111, 234, 255, 235));
+
+    if (ui->drawPileLabel) {
+        auto* effect = new QGraphicsDropShadowEffect(ui->drawPileLabel);
+        effect->setBlurRadius(16);
+        effect->setOffset(0, 0);
+        effect->setColor(QColor(72, 222, 255, 120));
+        ui->drawPileLabel->setGraphicsEffect(effect);
+    }
+    if (ui->discardPileLabel) {
+        auto* effect = new QGraphicsDropShadowEffect(ui->discardPileLabel);
+        effect->setBlurRadius(16);
+        effect->setOffset(0, 0);
+        effect->setColor(QColor(255, 165, 60, 120));
+        ui->discardPileLabel->setGraphicsEffect(effect);
+    }
+}
+
+void MainWindow::applyActorImageStyle(QLabel* label, const QColor& glowColor, int blurRadius)
+{
+    if (!label) {
+        return;
+    }
+
+    label->setStyleSheet(
+        "QLabel {"
+        "background-color: qradialgradient(cx:0.50, cy:0.66, radius:0.58, "
+        "fx:0.50, fy:0.66, "
+        "stop:0 rgba(95, 210, 255, 70), "
+        "stop:0.42 rgba(40, 95, 160, 42), "
+        "stop:0.72 rgba(8, 14, 28, 96), "
+        "stop:1 rgba(0, 0, 0, 0));"
+        "border: none;"
+        "}"
+    );
+
+    auto* effect = new QGraphicsDropShadowEffect(label);
+    effect->setBlurRadius(blurRadius);
+    effect->setOffset(0, 0);
+    effect->setColor(glowColor);
+    label->setGraphicsEffect(effect);
+}
+
+void MainWindow::applyResourceIconStyle(QLabel* label, const QColor& glowColor, int blurRadius, bool circular)
+{
+    if (!label) {
+        return;
+    }
+
+    const QString radiusPart = circular ? "18px" : "14px";
+    label->setStyleSheet(QString(
+        "QLabel {"
+        "background-color: qradialgradient(cx:0.50, cy:0.50, radius:0.62, "
+        "fx:0.50, fy:0.50, "
+        "stop:0 rgba(255, 255, 255, 20), "
+        "stop:0.34 rgba(110, 215, 255, 36), "
+        "stop:0.70 rgba(8, 18, 32, 128), "
+        "stop:1 rgba(0, 0, 0, 0));"
+        "border: 1px solid rgba(105, 225, 255, 90);"
+        "border-radius: %1;"
+        "padding: 4px;"
+        "}"
+    ).arg(radiusPart));
+
+    auto* effect = new QGraphicsDropShadowEffect(label);
+    effect->setBlurRadius(blurRadius);
+    effect->setOffset(0, 0);
+    effect->setColor(glowColor);
+    label->setGraphicsEffect(effect);
+}
+
+void MainWindow::applyResourceCountStyle(QLabel* label, const QColor& glowColor)
+{
+    if (!label) {
+        return;
+    }
+
+    auto* effect = new QGraphicsDropShadowEffect(label);
+    effect->setBlurRadius(18);
+    effect->setOffset(0, 0);
+    effect->setColor(glowColor);
+    label->setGraphicsEffect(effect);
+    label->setAlignment(Qt::AlignCenter);
+}
+
 void MainWindow::resetRuntimeState()
 {
+    hideGameResultOverlay();
+    hideHelpOverlay();
+
     ++executionToken;
     ++sideHighlightToken;
 
@@ -429,9 +772,23 @@ void MainWindow::executeNextCode(int index, int token)
             return;
         }
 
+        const int oldPlayerHp = gameManager->player.hp;
+        const int oldPlayerShield = gameManager->player.shield;
+
+        Enemy* oldEnemy = firstAliveEnemy();
+        const int oldEnemyHp = oldEnemy ? oldEnemy->hp : 0;
+        const int oldEnemyShield = oldEnemy ? oldEnemy->shield : 0;
+
+        CodeCommandView command;
+        const QVector<CodeCommandView> commands = gameManager->getCodeCommandViews();
+        if (index >= 0 && index < commands.size()) {
+            command = commands[index];
+        }
+
         gameManager->executePendingCode(index);
         refreshUi();
         refreshMainCodeEditor();
+        playCommandFeedback(command, oldPlayerHp, oldPlayerShield, oldEnemyHp, oldEnemyShield);
 
         if (gameManager->isBattleOver()) {
             clearCodeHighlight();
@@ -451,15 +808,469 @@ void MainWindow::showGameOverMessage()
     refreshUi();
     refreshMainCodeEditor();
 
-    QMessageBox::information(
-        this,
-        "游戏结束",
-        gameManager && gameManager->isPlayerWin() ? "胜利！" : "失败！"
-        );
+    const bool playerWin = gameManager && gameManager->isPlayerWin();
+    showGameResultOverlay(playerWin);
 
     setControlsEnabled(false);
     ui->restartButton->setEnabled(true);
     ui->helpButton->setEnabled(true);
+}
+
+void MainWindow::showGameResultOverlay(bool playerWin)
+{
+    hideGameResultOverlay();
+
+    gameOverOverlay = new QWidget(ui->centralwidget);
+    gameOverOverlay->setObjectName("gameOverOverlay");
+    gameOverOverlay->setAttribute(Qt::WA_StyledBackground, true);
+    gameOverOverlay->setGeometry(ui->centralwidget->rect());
+    gameOverOverlay->setStyleSheet(
+        "QWidget#gameOverOverlay {"
+        "background-color: rgba(0, 0, 0, 165);"
+        "}"
+        "QWidget#resultCard {"
+        "background-color: rgba(5, 10, 18, 232);"
+        "border: 2px solid rgba(105, 225, 255, 210);"
+        "border-radius: 18px;"
+        "}"
+        "QLabel#resultTitleLabel {"
+        "font-family: 'Microsoft YaHei UI', 'Segoe UI';"
+        "font-size: 40px;"
+        "font-weight: 900;"
+        "letter-spacing: 3px;"
+        "}"
+        "QLabel#resultSubLabel {"
+        "font-size: 17px;"
+        "color: #D7F7FF;"
+        "}"
+        "QLabel#resultCodeLabel {"
+        "font-family: Consolas, 'Microsoft YaHei UI';"
+        "font-size: 15px;"
+        "color: #C9F4FF;"
+        "background-color: rgba(2, 6, 12, 190);"
+        "border: 1px solid rgba(45, 198, 255, 130);"
+        "border-radius: 10px;"
+        "padding: 12px;"
+        "}"
+        "QPushButton {"
+        "background-color: rgba(10, 22, 34, 235);"
+        "color: #E8FBFF;"
+        "border: 1px solid #2DC6FF;"
+        "border-radius: 10px;"
+        "padding: 8px 18px;"
+        "font-size: 15px;"
+        "font-weight: 700;"
+        "}"
+        "QPushButton:hover {"
+        "background-color: rgba(25, 62, 90, 240);"
+        "border: 1px solid #9BEFFF;"
+        "}"
+    );
+
+    QVBoxLayout* overlayLayout = new QVBoxLayout(gameOverOverlay);
+    overlayLayout->setContentsMargins(0, 0, 0, 0);
+    overlayLayout->addStretch();
+
+    QWidget* card = new QWidget(gameOverOverlay);
+    card->setObjectName("resultCard");
+    card->setAttribute(Qt::WA_StyledBackground, true);
+    card->setFixedSize(560, 360);
+
+    QVBoxLayout* cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(34, 28, 34, 28);
+    cardLayout->setSpacing(14);
+
+    QLabel* title = new QLabel(card);
+    title->setObjectName("resultTitleLabel");
+    title->setAlignment(Qt::AlignCenter);
+    title->setText(playerWin ? QStringLiteral("VICTORY") : QStringLiteral("DEFEAT"));
+    title->setStyleSheet(playerWin
+                             ? "QLabel#resultTitleLabel { color: #FFD66B; }"
+                             : "QLabel#resultTitleLabel { color: #FF5C7A; }");
+
+    QLabel* sub = new QLabel(card);
+    sub->setObjectName("resultSubLabel");
+    sub->setAlignment(Qt::AlignCenter);
+    sub->setWordWrap(true);
+    sub->setText(playerWin
+                     ? QStringLiteral("所有函数调用执行完毕，Boss 对象已被析构。")
+                     : QStringLiteral("玩家对象生命值归零，本次运行异常终止。"));
+
+    QLabel* code = new QLabel(card);
+    code->setObjectName("resultCodeLabel");
+    code->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    code->setText(playerWin
+                      ? QStringLiteral("if (boss.hp <= 0) {\n    player.gainExp();\n    return VICTORY;\n}")
+                      : QStringLiteral("if (player.hp <= 0) {\n    throw GameOverException();\n}") );
+
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    QPushButton* restart = new QPushButton(QStringLiteral("重新开始"), card);
+    QPushButton* help = new QPushButton(QStringLiteral("查看规则"), card);
+    QPushButton* close = new QPushButton(QStringLiteral("停留查看"), card);
+
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(restart);
+    buttonLayout->addWidget(help);
+    buttonLayout->addWidget(close);
+    buttonLayout->addStretch();
+
+    cardLayout->addWidget(title);
+    cardLayout->addWidget(sub);
+    cardLayout->addWidget(code);
+    cardLayout->addStretch();
+    cardLayout->addLayout(buttonLayout);
+
+    overlayLayout->addWidget(card, 0, Qt::AlignCenter);
+    overlayLayout->addStretch();
+
+    connect(restart, &QPushButton::clicked, this, [this]() {
+        startNewGame();
+    });
+    connect(help, &QPushButton::clicked, this, [this]() {
+        showHelpOverlay();
+    });
+    connect(close, &QPushButton::clicked, this, [this]() {
+        hideGameResultOverlay();
+        ui->restartButton->setEnabled(true);
+        ui->helpButton->setEnabled(true);
+    });
+
+    gameOverOverlay->show();
+    gameOverOverlay->raise();
+}
+
+void MainWindow::hideGameResultOverlay()
+{
+    if (!gameOverOverlay) {
+        return;
+    }
+
+    QWidget* overlay = gameOverOverlay;
+    gameOverOverlay = nullptr;
+    overlay->hide();
+    overlay->deleteLater();
+}
+
+void MainWindow::showHelpOverlay()
+{
+    hideHelpOverlay();
+
+    helpOverlay = new QWidget(ui->centralwidget);
+    helpOverlay->setObjectName("helpOverlay");
+    helpOverlay->setAttribute(Qt::WA_StyledBackground, true);
+    helpOverlay->setGeometry(ui->centralwidget->rect());
+    helpOverlay->setStyleSheet(
+        "QWidget#helpOverlay {"
+        "background-color: rgba(0, 0, 0, 150);"
+        "}"
+        "QWidget#helpCard {"
+        "background-color: rgba(4, 9, 18, 238);"
+        "border: 2px solid rgba(45, 198, 255, 210);"
+        "border-radius: 18px;"
+        "}"
+        "QLabel#helpTitleLabel {"
+        "color: #8BE9FF;"
+        "font-size: 30px;"
+        "font-weight: 900;"
+        "}"
+        "QTextBrowser {"
+        "background-color: rgba(2, 6, 12, 190);"
+        "border: 1px solid rgba(45, 198, 255, 120);"
+        "border-radius: 10px;"
+        "color: #D7F7FF;"
+        "font-family: 'Microsoft YaHei UI';"
+        "font-size: 14px;"
+        "padding: 12px;"
+        "}"
+        "QPushButton {"
+        "background-color: rgba(10, 22, 34, 235);"
+        "color: #E8FBFF;"
+        "border: 1px solid #2DC6FF;"
+        "border-radius: 10px;"
+        "padding: 8px 18px;"
+        "font-size: 15px;"
+        "font-weight: 700;"
+        "}"
+        "QPushButton:hover {"
+        "background-color: rgba(25, 62, 90, 240);"
+        "border: 1px solid #9BEFFF;"
+        "}"
+    );
+
+    QVBoxLayout* overlayLayout = new QVBoxLayout(helpOverlay);
+    overlayLayout->setContentsMargins(0, 0, 0, 0);
+    overlayLayout->addStretch();
+
+    QWidget* card = new QWidget(helpOverlay);
+    card->setObjectName("helpCard");
+    card->setAttribute(Qt::WA_StyledBackground, true);
+    card->setFixedSize(760, 520);
+
+    QVBoxLayout* cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(28, 24, 28, 24);
+    cardLayout->setSpacing(14);
+
+    QLabel* title = new QLabel(QStringLiteral("HELP / RULES"), card);
+    title->setObjectName("helpTitleLabel");
+    title->setAlignment(Qt::AlignCenter);
+
+    QTextBrowser* browser = new QTextBrowser(card);
+    browser->setOpenExternalLinks(false);
+    browser->setHtml(QStringLiteral(
+        "<h2 style='color:#8BE9FF;'>CodeCraft 规则说明</h2>"
+        "<p><b>目标：</b>在玩家生命归零前击败 Boss。</p>"
+        "<p><b>函数调用模式：</b>打出卡牌不会立即结算，而是把对应语句写入中间代码块。点击结束回合后，代码会从上到下依次执行。</p>"
+        "<p><b>代码高亮：</b>橙色表示当前正在执行的语句；左右两侧的 <code>tickStatuses()</code> 表示玩家与 Boss 的状态函数实现。</p>"
+        "<p><b>状态变化：</b>中毒、灼烧、再生、力量等效果会改变状态函数。函数实现变化时，对应代码行会用紫色高亮。</p>"
+        "<p><b>卡牌：</b>攻击、防御、治疗、强化、召唤等卡牌会生成不同代码语句。费用不足时无法写入代码。</p>"
+        "<p><b>抽弃牌：</b>抽牌堆为空时，弃牌堆会回收到抽牌堆。</p>"
+        "<p><b>C++ 映射：</b>玩家、随从、Boss 都是对象；出牌相当于写入函数调用；状态结算相当于执行成员函数。</p>"
+    ));
+
+    QPushButton* close = new QPushButton(QStringLiteral("关闭说明"), card);
+    connect(close, &QPushButton::clicked, this, [this]() {
+        hideHelpOverlay();
+    });
+
+    cardLayout->addWidget(title);
+    cardLayout->addWidget(browser, 1);
+    cardLayout->addWidget(close, 0, Qt::AlignCenter);
+
+    overlayLayout->addWidget(card, 0, Qt::AlignCenter);
+    overlayLayout->addStretch();
+
+    helpOverlay->show();
+    helpOverlay->raise();
+}
+
+void MainWindow::hideHelpOverlay()
+{
+    if (!helpOverlay) {
+        return;
+    }
+
+    QWidget* overlay = helpOverlay;
+    helpOverlay = nullptr;
+    overlay->hide();
+    overlay->deleteLater();
+}
+
+
+// ============================================================
+// 执行反馈动画
+// ============================================================
+
+void MainWindow::playCommandFeedback(const CodeCommandView& command,
+                                     int oldPlayerHp,
+                                     int oldPlayerShield,
+                                     int oldEnemyHp,
+                                     int oldEnemyShield)
+{
+    if (!gameManager) {
+        return;
+    }
+
+    const QString commandText = (command.title + "\n" + command.lines.join("\n")).toLower();
+    const bool looksLikeTick = commandText.contains("tickstatus") || commandText.contains("tickstate");
+    const bool looksLikePoison = commandText.contains("poison") || commandText.contains("中毒");
+    const bool looksLikeHeal = commandText.contains("heal") || commandText.contains("治疗") || commandText.contains("regen") || commandText.contains("再生");
+    const bool looksLikeShield = commandText.contains("shield") || commandText.contains("defend") || commandText.contains("防御") || commandText.contains("护盾");
+
+    Enemy* enemy = firstAliveEnemy();
+    const int newPlayerHp = gameManager->player.hp;
+    const int newPlayerShield = gameManager->player.shield;
+    const int newEnemyHp = enemy ? enemy->hp : oldEnemyHp;
+    const int newEnemyShield = enemy ? enemy->shield : oldEnemyShield;
+
+    const int playerHpDelta = newPlayerHp - oldPlayerHp;
+    const int playerShieldDelta = newPlayerShield - oldPlayerShield;
+    const int enemyHpDelta = newEnemyHp - oldEnemyHp;
+    const int enemyShieldDelta = newEnemyShield - oldEnemyShield;
+
+    const bool playerDidMove = commandText.contains("player") &&
+                               (commandText.contains("attack") || commandText.contains("takeDamage") || commandText.contains("summon"));
+    const bool enemyDidMove = (commandText.contains("enemy") || commandText.contains("boss")) &&
+                              (commandText.contains("attack") || commandText.contains("taketurn") || commandText.contains("takeDamage"));
+
+    if (playerDidMove && enemyHpDelta < 0) {
+        animateActorNudge(ui->playerImageLabel, 28);
+    }
+    if (enemyDidMove && playerHpDelta < 0) {
+        animateActorNudge(ui->enemyImageLabel, -28);
+    }
+
+    if (enemyHpDelta < 0) {
+        animateActorShake(ui->enemyImageLabel);
+        showFloatingText(ui->enemyImageLabel,
+                         QString("-%1").arg(-enemyHpDelta),
+                         looksLikePoison || looksLikeTick ? kPoisonTextColor : kDamageTextColor);
+    } else if (enemyHpDelta > 0) {
+        showFloatingText(ui->enemyImageLabel,
+                         QString("+%1").arg(enemyHpDelta),
+                         kHealTextColor);
+    }
+
+    if (playerHpDelta < 0) {
+        animateActorShake(ui->playerImageLabel);
+        showFloatingText(ui->playerImageLabel,
+                         QString("-%1").arg(-playerHpDelta),
+                         looksLikePoison || looksLikeTick ? kPoisonTextColor : kDamageTextColor);
+    } else if (playerHpDelta > 0 || looksLikeHeal) {
+        if (playerHpDelta > 0) {
+            showFloatingText(ui->playerImageLabel,
+                             QString("+%1").arg(playerHpDelta),
+                             kHealTextColor);
+        }
+    }
+
+    if (playerShieldDelta > 0 || looksLikeShield) {
+        if (playerShieldDelta > 0) {
+            showFloatingText(ui->playerImageLabel,
+                             QString("护盾 +%1").arg(playerShieldDelta),
+                             kShieldTextColor);
+        }
+    }
+
+    if (enemyShieldDelta > 0) {
+        showFloatingText(ui->enemyImageLabel,
+                         QString("护盾 +%1").arg(enemyShieldDelta),
+                         kShieldTextColor);
+    }
+}
+
+void MainWindow::animateActorNudge(QWidget* widget, int dx)
+{
+    if (!widget || !widget->isVisible()) {
+        return;
+    }
+
+    const QPoint origin = widget->pos();
+
+    QSequentialAnimationGroup* group = new QSequentialAnimationGroup(this);
+
+    QPropertyAnimation* forward = new QPropertyAnimation(widget, "pos");
+    forward->setDuration(120);
+    forward->setStartValue(origin);
+    forward->setEndValue(origin + QPoint(dx, 0));
+    forward->setEasingCurve(QEasingCurve::OutCubic);
+
+    QPropertyAnimation* back = new QPropertyAnimation(widget, "pos");
+    back->setDuration(160);
+    back->setStartValue(origin + QPoint(dx, 0));
+    back->setEndValue(origin);
+    back->setEasingCurve(QEasingCurve::OutBack);
+
+    group->addAnimation(forward);
+    group->addAnimation(back);
+
+    connect(group, &QSequentialAnimationGroup::finished, this, [widget, origin, group]() {
+        if (widget) {
+            widget->move(origin);
+        }
+        group->deleteLater();
+    });
+
+    group->start();
+}
+
+void MainWindow::animateActorShake(QWidget* widget)
+{
+    if (!widget || !widget->isVisible()) {
+        return;
+    }
+
+    const QPoint origin = widget->pos();
+    QSequentialAnimationGroup* group = new QSequentialAnimationGroup(this);
+
+    const QList<int> offsets = { -8, 8, -6, 6, -3, 3, 0 };
+    QPoint start = origin;
+
+    for (int off : offsets) {
+        QPropertyAnimation* anim = new QPropertyAnimation(widget, "pos");
+        anim->setDuration(45);
+        anim->setStartValue(start);
+        anim->setEndValue(origin + QPoint(off, 0));
+        anim->setEasingCurve(QEasingCurve::Linear);
+        group->addAnimation(anim);
+        start = origin + QPoint(off, 0);
+    }
+
+    connect(group, &QSequentialAnimationGroup::finished, this, [widget, origin, group]() {
+        if (widget) {
+            widget->move(origin);
+        }
+        group->deleteLater();
+    });
+
+    group->start();
+}
+
+void MainWindow::showFloatingText(QWidget* anchor,
+                                  const QString& text,
+                                  const QColor& color)
+{
+    if (!anchor || text.isEmpty()) {
+        return;
+    }
+
+    QRect anchorRect = geometryInCentral(anchor);
+    if (anchorRect.isNull()) {
+        return;
+    }
+
+    QLabel* label = new QLabel(ui->centralwidget);
+    label->setText(text);
+    label->setAlignment(Qt::AlignCenter);
+    label->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+
+    QFont font("Microsoft YaHei UI");
+    font.setPointSize(16);
+    font.setBold(true);
+    label->setFont(font);
+
+    label->setStyleSheet(QString(
+        "QLabel {"
+        "color: rgb(%1,%2,%3);"
+        "background: rgba(0, 0, 0, 90);"
+        "border: 1px solid rgba(%1,%2,%3,180);"
+        "border-radius: 10px;"
+        "padding: 4px 10px;"
+        "}"
+    ).arg(color.red()).arg(color.green()).arg(color.blue()));
+
+    label->adjustSize();
+    const int x = anchorRect.center().x() - label->width() / 2;
+    const int y = anchorRect.top() + anchorRect.height() / 4;
+    label->move(x, y);
+    label->show();
+    label->raise();
+
+    QGraphicsOpacityEffect* opacity = new QGraphicsOpacityEffect(label);
+    label->setGraphicsEffect(opacity);
+
+    QParallelAnimationGroup* group = new QParallelAnimationGroup(this);
+
+    QPropertyAnimation* move = new QPropertyAnimation(label, "pos");
+    move->setDuration(800);
+    move->setStartValue(label->pos());
+    move->setEndValue(label->pos() + QPoint(0, -55));
+    move->setEasingCurve(QEasingCurve::OutCubic);
+
+    QPropertyAnimation* fade = new QPropertyAnimation(opacity, "opacity");
+    fade->setDuration(800);
+    fade->setStartValue(1.0);
+    fade->setEndValue(0.0);
+    fade->setEasingCurve(QEasingCurve::InCubic);
+
+    group->addAnimation(move);
+    group->addAnimation(fade);
+
+    connect(group, &QParallelAnimationGroup::finished, this, [label, group]() {
+        label->deleteLater();
+        group->deleteLater();
+    });
+
+    group->start();
 }
 
 // ============================================================
@@ -478,6 +1289,7 @@ void MainWindow::animateGhost(const QRect& startRect,
     ghost->setText(text);
     ghost->setToolTip(toolTip);
     ghost->setGeometry(startRect);
+    ghost->setStyleSheet(cardButtonStyle(QStringLiteral("#8BE9FF"), true));
     ghost->show();
     ghost->raise();
 
@@ -567,6 +1379,7 @@ void MainWindow::refreshUi()
     refreshPileUi();
     refreshHandUi();
     refreshMinionUi();
+    refreshImageUi();
     refreshSideCodeEditors();
 }
 
@@ -576,6 +1389,7 @@ void MainWindow::refreshPlayerUi()
 
     ui->playerHpLabel->setText(QString("玩家生命：%1/%2").arg(player.hp).arg(player.maxHp));
     ui->playerEnergyLabel->setText(QString("玩家能量：%1/%2").arg(player.energy).arg(player.maxEnergy));
+    ui->energyValueLabel->setText(QString("%1/%2").arg(player.energy).arg(player.maxEnergy));
     ui->playerShieldLabel->setText(QString("玩家护盾：%1").arg(player.shield));
 
     int strength = 0;
@@ -614,16 +1428,22 @@ void MainWindow::refreshEnemyUi()
         toQString(gameManager->getEnemyIntentText())
         );
 
-    // bossSkillLabel 只作为“技能卡片入口”显示。
-    // 具体技能说明放在 ToolTip 中，不再混入基础攻击、实际攻击、护盾等属性信息。
+    // bossSkillLabel 只作为“技能卡片入口”显示，完整技能说明通过美化后的 ToolTip 展示。
     ui->bossSkillLabel->setText("Boss 技能");
+    ui->bossSkillLabel->setCursor(Qt::PointingHandCursor);
     ui->bossSkillLabel->setToolTip(buildBossSpecialSkillText(enemy));
 }
 
 void MainWindow::refreshPileUi()
 {
-    ui->drawPileLabel->setText(QString("抽牌堆\n%1").arg(gameManager->getDrawPileCount()));
-    ui->discardPileLabel->setText(QString("弃牌堆\n%1").arg(gameManager->getDiscardPileCount()));
+    const int drawCount = gameManager->getDrawPileCount();
+    const int discardCount = gameManager->getDiscardPileCount();
+
+    ui->drawPileLabel->setText("抽牌堆");
+    ui->discardPileLabel->setText("弃牌堆");
+
+    ui->drawPileCountLabel->setText(QString::number(drawCount));
+    ui->discardPileCountLabel->setText(QString::number(discardCount));
 }
 
 void MainWindow::refreshHandUi()
@@ -636,25 +1456,32 @@ void MainWindow::refreshHandUi()
 
         if (!hasCard) {
             cardButtons[i]->setText("");
+            cardButtons[i]->setToolTip(QString());
             cardButtons[i]->hide();
             cardButtons[i]->setEnabled(false);
             continue;
         }
 
         const CardView& card = handView[i];
+        const bool playable = controlsEnabled && gameManager->player.energy >= card.cost;
+
         cardButtons[i]->setText(formatCardText(card));
-        cardButtons[i]->setToolTip(qstr(card.description));
+        cardButtons[i]->setToolTip(cardToolTipText(card));
         cardButtons[i]->show();
-        cardButtons[i]->setEnabled(controlsEnabled && gameManager->player.energy >= card.cost);
+        cardButtons[i]->setEnabled(playable);
+        updateCardButtonStyle(cardButtons[i], card, playable);
     }
 }
 
 void MainWindow::refreshMinionUi()
 {
     QLabel* labels[2] = { ui->minionHpLabel1, ui->minionHpLabel2 };
-    for (QLabel* label : labels) {
-        label->hide();
-        label->clear();
+    QLabel* images[2] = { ui->minionImageLabel1, ui->minionImageLabel2 };
+
+    for (int i = 0; i < 2; ++i) {
+        labels[i]->hide();
+        labels[i]->clear();
+        images[i]->hide();
     }
 
     int slot = 0;
@@ -680,8 +1507,23 @@ void MainWindow::refreshMinionUi()
 
         labels[slot]->setText(lines.join("\n"));
         labels[slot]->show();
+        images[slot]->show();
         ++slot;
     }
+}
+
+void MainWindow::refreshImageUi()
+{
+    if (!gameManager) {
+        return;
+    }
+
+    ui->playerImageLabel->show();
+
+    Enemy* enemy = firstAliveEnemy();
+    ui->enemyImageLabel->setVisible(enemy != nullptr);
+
+    // 图片内容初始化时已经设置；这里主要控制显隐。
 }
 
 void MainWindow::refreshMainCodeEditor()
@@ -1035,18 +1877,7 @@ void MainWindow::on_restartButton_clicked()
 
 void MainWindow::on_helpButton_clicked()
 {
-    QString helpText =
-        "CodeCraft：C++ 卡牌对战游戏\n\n"
-        "新的函数调用模式：\n"
-        "1. 玩家和怪物分别视作由不同类创建的对象。\n"
-        "2. 中间代码块展示本回合将依次执行的函数调用。\n"
-        "3. 玩家每打出一张牌，不会立刻结算效果，而是向代码块写入对应语句。\n"
-        "4. 玩家点击结束回合后，代码块会从上到下依次执行。\n"
-        "5. 当前执行语句使用橙红色文字高亮。\n"
-        "6. 左右两侧显示 tickStatuses() 的具体实现。\n"
-        "7. 状态或技能导致函数实现改变时，改变的代码行会用紫色文字高亮。";
-
-    QMessageBox::information(this, "游戏说明", helpText);
+    showHelpOverlay();
 }
 
 // ============================================================
@@ -1057,6 +1888,58 @@ QRect MainWindow::geometryInCentral(QWidget* widget) const
 {
     QPoint topLeft = widget->mapTo(ui->centralwidget, QPoint(0, 0));
     return QRect(topLeft, widget->size());
+}
+
+void MainWindow::setScaledPixmap(QLabel* label,
+                                 const QString& resourcePath,
+                                 Qt::AspectRatioMode mode)
+{
+    if (!label) {
+        return;
+    }
+
+    QPixmap pixmap(resourcePath);
+    label->setAlignment(Qt::AlignCenter);
+    label->setFrameShape(QFrame::NoFrame);
+    label->setAutoFillBackground(false);
+    label->setAttribute(Qt::WA_TranslucentBackground, true);
+
+    if (pixmap.isNull()) {
+        label->setPixmap(QPixmap());
+        label->setText(QString("缺少图片\n%1").arg(resourcePath));
+        label->setStyleSheet(
+            "QLabel {"
+            "color: #66E6FF;"
+            "background: transparent;"
+            "border: none;"
+            "}"
+        );
+        return;
+    }
+
+    label->setText("");
+    label->setStyleSheet("QLabel { background: transparent; border: none; }");
+
+    QPixmap output;
+    if (label->width() > 0 && label->height() > 0) {
+        output = pixmap.scaled(label->size(), mode, Qt::SmoothTransformation);
+    } else {
+        output = pixmap;
+        label->setScaledContents(true);
+    }
+
+    // 背景图做轻微压暗，避免和人物立绘争夺视觉焦点。
+    if (label == ui->battleBackgroundLabel && !output.isNull()) {
+        QPixmap dimmed(output.size());
+        dimmed.fill(Qt::transparent);
+        QPainter painter(&dimmed);
+        painter.drawPixmap(0, 0, output);
+        painter.fillRect(dimmed.rect(), QColor(0, 0, 0, kBackgroundDimAlpha));
+        painter.end();
+        output = dimmed;
+    }
+
+    label->setPixmap(output);
 }
 
 void MainWindow::setControlsEnabled(bool enabled)
@@ -1084,7 +1967,178 @@ Enemy* MainWindow::firstAliveEnemy() const
 
 QString MainWindow::formatCardText(const CardView& card) const
 {
-    return QString("%1\n费用：%2").arg(qstr(card.name)).arg(card.cost);
+    // 牌面空间有限：只显示名称、类别和费用。
+    // 完整描述与“将写入的代码”保留在 ToolTip 中查看。
+    return QString("【%1】\n%2\n⚡ 费用：%3")
+        .arg(qstr(card.name))
+        .arg(cardKindText(card))
+        .arg(card.cost);
+}
+
+QString MainWindow::cardKindText(const CardView& card) const
+{
+    const QString text = (qstr(card.name) + " " + qstr(card.description)).toLower();
+
+    if (text.contains("攻击") || text.contains("strike") || text.contains("damage") || text.contains("全力")) {
+        return QStringLiteral("攻击指令");
+    }
+    if (text.contains("防御") || text.contains("护盾") || text.contains("defend") || text.contains("shield")) {
+        return QStringLiteral("防御指令");
+    }
+    if (text.contains("治疗") || text.contains("恢复") || text.contains("heal") || text.contains("regen")) {
+        return QStringLiteral("恢复指令");
+    }
+    if (text.contains("召唤") || text.contains("summon") || text.contains("仆从")) {
+        return QStringLiteral("对象创建");
+    }
+    if (text.contains("强化") || text.contains("函数") || text.contains("function") || text.contains("template")) {
+        return QStringLiteral("函数改写");
+    }
+
+    return QStringLiteral("代码指令");
+}
+
+QString MainWindow::cardCodePreview(const CardView& card) const
+{
+    QString preview;
+    for (const QString& line : card.codeLines) {
+        const QString trimmed = line.trimmed();
+        if (!trimmed.isEmpty()) {
+            preview = trimmed;
+            break;
+        }
+    }
+
+    if (preview.isEmpty()) {
+        return QStringLiteral("// 无代码");
+    }
+
+    const int maxLen = 22;
+    if (preview.size() > maxLen) {
+        preview = preview.left(maxLen - 1) + QStringLiteral("…");
+    }
+    return preview;
+}
+
+QString MainWindow::cardCodeHtml(const CardView& card) const
+{
+    if (card.codeLines.isEmpty()) {
+        return QStringLiteral("<span style='color:#8AA0AA;'>// 无代码</span>");
+    }
+
+    QStringList htmlLines;
+    for (const QString& line : card.codeLines) {
+        QString escaped = line.toHtmlEscaped();
+        if (escaped.trimmed().startsWith("//")) {
+            escaped = QString("<span style='color:#76D982;font-style:italic;'>%1</span>").arg(escaped);
+        } else {
+            escaped = QString("<span style='color:#F7FDFF;'>%1</span>").arg(escaped);
+        }
+        htmlLines << escaped;
+    }
+
+    return htmlLines.join("<br>");
+}
+
+QString MainWindow::cardAccentColor(const CardView& card) const
+{
+    const QString kind = cardKindText(card);
+
+    if (kind.contains("攻击")) {
+        return QStringLiteral("#FF8A3D");
+    }
+    if (kind.contains("防御")) {
+        return QStringLiteral("#58C7FF");
+    }
+    if (kind.contains("恢复")) {
+        return QStringLiteral("#6DFF9A");
+    }
+    if (kind.contains("对象")) {
+        return QStringLiteral("#7CFFEA");
+    }
+    if (kind.contains("函数")) {
+        return QStringLiteral("#B86CFF");
+    }
+
+    return QStringLiteral("#6FEAFF");
+}
+
+QString MainWindow::cardToolTipText(const CardView& card) const
+{
+    const QString accent = cardAccentColor(card);
+    const QString name = qstr(card.name).toHtmlEscaped();
+    const QString kind = cardKindText(card).toHtmlEscaped();
+    const QString desc = qstr(card.description).toHtmlEscaped().replace("\n", "<br>");
+    const QString code = cardCodeHtml(card);
+
+    return QString(
+        "<html>"
+        "<body style='background-color:#07111C;color:#F7FDFF;font-family:Microsoft YaHei UI,Segoe UI;"
+        "font-size:10.5pt;line-height:150%;'>"
+        "<div style='color:%1;font-size:13pt;font-weight:800;'>%2</div>"
+        "<div style='color:#B9EFFF;font-weight:700;'>%3 · ⚡ 费用 %4</div>"
+        "<hr style='border:0;border-top:1px solid #2DC6FF;margin:6px 0;'>"
+        "<div style='color:#F2FDFF;font-weight:700;'>完整描述</div>"
+        "<div style='color:#E6F9FF;'>%5</div>"
+        "<div style='height:6px;'></div>"
+        "<div style='color:#F2FDFF;font-weight:700;'>将写入代码块</div>"
+        "<pre style='background-color:#030812;color:#F7FDFF;border:1px solid #1E6F86;"
+        "border-radius:6px;padding:6px;font-family:Consolas,Microsoft YaHei UI;font-size:10pt;'>%6</pre>"
+        "</body></html>")
+        .arg(accent, name, kind)
+        .arg(card.cost)
+        .arg(desc)
+        .arg(code);
+}
+
+QString MainWindow::cardButtonStyle(const QString& accent, bool playable) const
+{
+    const QString textColor = playable ? QStringLiteral("#F4FDFF") : QStringLiteral("#77848C");
+    const QString borderColor = playable ? accent : QStringLiteral("#45515A");
+    const QString hoverBorder = playable ? QStringLiteral("#FFFFFF") : QStringLiteral("#45515A");
+    const QString bg = playable
+        ? QStringLiteral("rgba(8, 13, 24, 225)")
+        : QStringLiteral("rgba(14, 16, 22, 145)");
+    const QString hoverBg = playable
+        ? QStringLiteral("rgba(18, 40, 62, 238)")
+        : QStringLiteral("rgba(14, 16, 22, 145)");
+
+    return QString(
+        "QPushButton {"
+        "background-color:%1;"
+        "color:%2;"
+        "border:2px solid %3;"
+        "border-radius:12px;"
+        "padding:8px 6px;"
+        "font-family:'Microsoft YaHei UI','Segoe UI';"
+        "font-size:13px;"
+        "font-weight:800;"
+        "text-align:center;"
+        "}"
+        "QPushButton:hover {"
+        "background-color:%4;"
+        "border:2px solid %5;"
+        "}"
+        "QPushButton:pressed {"
+        "background-color:rgba(42, 82, 108, 245);"
+        "padding-top:10px;"
+        "padding-left:7px;"
+        "}"
+        "QPushButton:disabled {"
+        "background-color:rgba(12, 14, 20, 145);"
+        "color:#6A747C;"
+        "border:1px solid #38434C;"
+        "}")
+        .arg(bg, textColor, borderColor, hoverBg, hoverBorder);
+}
+
+void MainWindow::updateCardButtonStyle(QPushButton* button, const CardView& card, bool playable)
+{
+    if (!button) {
+        return;
+    }
+
+    button->setStyleSheet(cardButtonStyle(cardAccentColor(card), playable));
 }
 
 QString MainWindow::statusTypeText(StatusType type) const
@@ -1130,15 +2184,31 @@ QString MainWindow::buildStatusSummary(const std::vector<Status>& statuses) cons
 QString MainWindow::buildBossSpecialSkillText(Enemy* enemy) const
 {
     if (!enemy) {
-        return QStringLiteral("无特殊技能");
+        return QStringLiteral("<html><body style='color:#F7FDFF;'>无特殊技能</body></html>");
     }
 
-    QStringList lines;
+    QStringList items;
     for (const std::string& line : enemy->getDescription()) {
-        lines << QString::fromStdString(line);
+        const QString text = QString::fromStdString(line).toHtmlEscaped();
+        if (!text.trimmed().isEmpty()) {
+            items << QString("<div style='margin:3px 0;color:#F2FDFF;'>• %1</div>").arg(text);
+        }
     }
 
-    return lines.isEmpty() ? QStringLiteral("无特殊技能") : lines.join(QStringLiteral("\n"));
+    if (items.isEmpty()) {
+        items << QStringLiteral("<div style='color:#F2FDFF;'>无特殊技能</div>");
+    }
+
+    return QString(
+        "<html>"
+        "<body style='background-color:#07111C;color:#F7FDFF;font-family:Microsoft YaHei UI,Segoe UI;"
+        "font-size:10.5pt;line-height:150%;'>"
+        "<div style='color:#B86CFF;font-size:13pt;font-weight:800;'>Boss 技能说明</div>"
+        "<div style='color:#8BE9FF;font-weight:700;margin-bottom:4px;'>%1</div>"
+        "<hr style='border:0;border-top:1px solid #6B3AA0;margin:6px 0;'>"
+        "%2"
+        "</body></html>")
+        .arg(QString::fromStdString(enemy->name).toHtmlEscaped(), items.join(""));
 }
 
 QString MainWindow::toQString(const std::string& s) const

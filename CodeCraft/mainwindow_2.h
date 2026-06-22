@@ -9,8 +9,6 @@
 #include <QVector>
 #include <QStringList>
 #include <QEasingCurve>
-#include <QLabel>
-#include <QColor>
 
 #include <functional>
 #include <memory>
@@ -32,9 +30,6 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-
-protected:
-    void resizeEvent(QResizeEvent* event) override;
 
 private slots:
     void on_cardButton1_clicked();
@@ -81,9 +76,6 @@ private:
     SideCodeState enemyCode;
     QVector<SideHighlightRequest> sideHighlightQueue;
 
-    QWidget* gameOverOverlay = nullptr;
-    QWidget* helpOverlay = nullptr;
-
     int activeCodeIndex = -1;
     int executionToken = 0;
     int sideHighlightToken = 0;
@@ -94,12 +86,6 @@ private:
     void initCardButtons();
     void initCodeEditors();
     void setupCodeEditor(QPlainTextEdit* editor);
-    void initTheme();
-    void initImageAssets();
-    void initCharacterContrast();
-    void initResourceContrast();
-    void initOverlays();
-    void positionOverlays();
     void resetRuntimeState();
     void startNewGame();
     void beginTurnWithoutAutoDraw();
@@ -111,22 +97,6 @@ private:
     void executeCodeQueue();
     void executeNextCode(int index, int token);
     void showGameOverMessage();
-    void showGameResultOverlay(bool playerWin);
-    void hideGameResultOverlay();
-    void showHelpOverlay();
-    void hideHelpOverlay();
-
-    // 执行反馈动画
-    void playCommandFeedback(const CodeCommandView& command,
-                             int oldPlayerHp,
-                             int oldPlayerShield,
-                             int oldEnemyHp,
-                             int oldEnemyShield);
-    void animateActorNudge(QWidget* widget, int dx);
-    void animateActorShake(QWidget* widget);
-    void showFloatingText(QWidget* anchor,
-                          const QString& text,
-                          const QColor& color);
 
     // 动画
     void animateGhost(const QRect& startRect,
@@ -149,7 +119,6 @@ private:
     void refreshPileUi();
     void refreshHandUi();
     void refreshMinionUi();
-    void refreshImageUi();
     void refreshMainCodeEditor();
     void refreshSideCodeEditors();
     void updateSideCode(Side side, const QStringList& newDisplayedLines);
@@ -178,21 +147,8 @@ private:
     void setControlsEnabled(bool enabled);
 
     QRect geometryInCentral(QWidget* widget) const;
-    void setScaledPixmap(QLabel* label,
-                         const QString& resourcePath,
-                         Qt::AspectRatioMode mode = Qt::KeepAspectRatio);
-    void applyActorImageStyle(QLabel* label, const QColor& glowColor, int blurRadius);
-    void applyResourceIconStyle(QLabel* label, const QColor& glowColor, int blurRadius, bool circular = false);
-    void applyResourceCountStyle(QLabel* label, const QColor& glowColor);
     Enemy* firstAliveEnemy() const;
     QString formatCardText(const CardView& card) const;
-    QString cardKindText(const CardView& card) const;
-    QString cardCodePreview(const CardView& card) const;
-    QString cardCodeHtml(const CardView& card) const;
-    QString cardAccentColor(const CardView& card) const;
-    QString cardToolTipText(const CardView& card) const;
-    QString cardButtonStyle(const QString& accent, bool playable) const;
-    void updateCardButtonStyle(QPushButton* button, const CardView& card, bool playable);
     QString statusTypeText(StatusType type) const;
     QString buildStatusSummary(const std::vector<Status>& statuses) const;
     QString buildBossSpecialSkillText(Enemy* enemy) const;

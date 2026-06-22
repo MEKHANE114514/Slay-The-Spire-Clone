@@ -22,7 +22,6 @@ struct CardView {
     QString description;
     int cost = 0;
     TargetMode targetMode = TargetMode::NONE;
-    QStringList codeLines;   // 这张牌打出后会写入主代码块的代码行
 };
 
 struct DrawResult {

@@ -6,5 +6,6 @@ debug/cards.o
 debug/enemy.o
 debug/minion.o
 debug/player.o
+debug/qrc_resources.o
 debug/qrc_qmake_qmake_qm_files.o
 debug/moc_mainwindow.o
