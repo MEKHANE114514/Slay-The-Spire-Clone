@@ -32,7 +32,6 @@ static CardView makeCardViewFromCard(const Card* card)
     }
     return view;
 }
-}
 
 GameManager::GameManager(int nodeId)
     : battle(player)
@@ -289,9 +288,10 @@ void GameManager::generateMap(int seed) {
         start.id = nextId++;
         start.depth = 0;
         start.isStart = true;
-        currentMap.nodes.push_back(start);
-        currentMap.startNodeId = start.id;
-        layerNodes[0].push_back(start.id);
+        int startId = start.id;
+        currentMap.nodes.push_back(std::move(start));
+        currentMap.startNodeId = startId;
+        layerNodes[0].push_back(startId);
     }
 
     // ---- 3. 创建中间战斗节点（layer 1 到 battleDepth）----
@@ -321,8 +321,9 @@ void GameManager::generateMap(int seed) {
                     }
                 }
             }
-            currentMap.nodes.push_back(node);
-            layerNodes[layer].push_back(node.id);
+            int nodeId = node.id;
+            currentMap.nodes.push_back(std::move(node));
+            layerNodes[layer].push_back(nodeId);
         }
     }
 
@@ -334,9 +335,10 @@ void GameManager::generateMap(int seed) {
         boss.depth = totalDepth;
         boss.isBoss = true;
         boss.enemyTypes = {bossType};
-        currentMap.nodes.push_back(boss);
-        currentMap.bossNodeId = boss.id;
-        layerNodes[totalDepth].push_back(boss.id);
+        int bossId = boss.id;
+        currentMap.nodes.push_back(std::move(boss));
+        currentMap.bossNodeId = bossId;
+        layerNodes[totalDepth].push_back(bossId);
     }
 
     // ---- 5. 构建邻接表（区间划分式连边）----
