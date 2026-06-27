@@ -2,21 +2,25 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QVector>
+#include <QPlainTextEdit>
 #include <QPushButton>
-#include <QStringList>
 #include <QRect>
-#include <QTextEdit>
+#include <QSet>
+#include <QVector>
+#include <QStringList>
+#include <QEasingCurve>
+#include <QLabel>
+#include <QColor>
 
 #include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "game_manager.h"
 
 QT_BEGIN_NAMESPACE
-namespace Ui {
-class MainWindow;
-}
+namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
 class Enemy;
@@ -29,89 +33,184 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+
 private slots:
     void on_cardButton1_clicked();
     void on_cardButton2_clicked();
     void on_cardButton3_clicked();
     void on_cardButton4_clicked();
     void on_cardButton5_clicked();
-
     void on_endTurnButton_clicked();
     void on_restartButton_clicked();
     void on_helpButton_clicked();
 
 private:
+    enum class Side { Player, Enemy };
+
     struct CodeRange {
-        int startLine = -1;   // QPlainTextEdit 中的 0-based 行号
-        int lineCount = 0;    // 需要高亮几行；for/if 块会大于 1
+        int startLine = -1;
+        int lineCount = 0;
+        bool callsPlayerTick = false;
+        bool callsEnemyTick = false;
+    };
+
+    struct SideCodeState {
+        QPlainTextEdit* editor = nullptr;
+        QStringList displayedLines;
+        QStringList bodyLines;
+        QSet<int> changedLines;
+        QSet<int> executingLines;
+    };
+
+    struct SideHighlightRequest {
+        Side side = Side::Player;
+        QSet<int> lines;
     };
 
 private:
-    Ui::MainWindow *ui;
-
+    Ui::MainWindow *ui = nullptr;
     std::unique_ptr<GameManager> gameManager;
 
     QStringList logs;
     QVector<QPushButton*> cardButtons;
     QVector<CodeRange> codeRanges;
-    int activeCodeCommandIndex = -1; // 当前正在执行/高亮的代码段编号，-1 表示没有
 
-    int executionToken = 0;       // 重新开始时让旧的 QTimer 回调失效
-    bool controlsEnabled = false; // 当前是否允许玩家点击卡牌/结束回合
+    SideCodeState playerCode;
+    SideCodeState enemyCode;
+    QVector<SideHighlightRequest> sideHighlightQueue;
 
-    // 初始化
+    QWidget* gameOverOverlay = nullptr;
+    QWidget* helpOverlay = nullptr;
+    QWidget* mapOverlay = nullptr;
+    QWidget* rewardOverlay = nullptr;
+
+    int activeCodeIndex = -1;
+    int executionToken = 0;
+    int sideHighlightToken = 0;
+    bool controlsEnabled = false;
+    bool sideChangeHighlightActive = false;
+
+    // 初始化 / 流程
     void initCardButtons();
-    void initCodeEditor();
+    void initCodeEditors();
+    void setupCodeEditor(QPlainTextEdit* editor);
+    void initTheme();
+    void initImageAssets();
+    void initCharacterContrast();
+    void initResourceContrast();
+    void initOverlays();
+    void positionOverlays();
+    void resetRuntimeState();
     void startNewGame();
-
-    // 回合流程
     void beginTurnWithoutAutoDraw();
     void startTurnDrawFive();
     void drawNextCard(int remainingCount);
 
-    // 出牌流程：出牌只写入代码，不立即结算效果
+    // 出牌 / 执行
     void playCardByIndex(int index);
-
-    // 结束回合后的代码执行流程
     void executeCodeQueue();
     void executeNextCode(int index, int token);
     void showGameOverMessage();
+    void showGameResultOverlay(bool playerWin);
+    void hideGameResultOverlay();
+    void showMapOverlay();
+    void hideMapOverlay();
+    void showRewardOverlay();
+    void hideRewardOverlay();
+    void finishRewardAndShowMap();
+    void enterMapNode(int nodeId);
+    void showHelpOverlay();
+    void hideHelpOverlay();
+
+    // 执行反馈动画
+    void playCommandFeedback(const CodeCommandView& command,
+                             int oldPlayerHp,
+                             int oldPlayerShield,
+                             int oldEnemyHp,
+                             int oldEnemyShield);
+    void animateActorNudge(QWidget* widget, int dx);
+    void animateActorShake(QWidget* widget);
+    void showFloatingText(QWidget* anchor,
+                          const QString& text,
+                          const QColor& color);
 
     // 动画
-    void drawOneCardAnimation(int handIndex,
-                              const CardView& card,
+    void animateGhost(const QRect& startRect,
+                      const QRect& endRect,
+                      const QString& text,
+                      const QString& toolTip,
+                      int duration,
+                      QEasingCurve::Type easing,
+                      std::function<void()> onFinished);
+    void drawOneCardAnimation(int handIndex, const CardView& card,
                               std::function<void()> onFinished);
-
-    void playCardToDiscardAnimation(int index,
-                                    const CardView& card,
+    void playCardToDiscardAnimation(int index, const CardView& card,
                                     std::function<void()> onFinished);
-
     void recycleDiscardToDrawPileAnimation(std::function<void()> onFinished);
 
-    // 刷新界面
+    // 刷新
     void refreshUi();
     void refreshPlayerUi();
     void refreshEnemyUi();
     void refreshPileUi();
     void refreshHandUi();
-    void refreshCodeEditor();
+    void refreshMinionUi();
+    void refreshImageUi();
+    void refreshMainCodeEditor();
+    void refreshSideCodeEditors();
+    void updateSideCode(Side side, const QStringList& newDisplayedLines);
 
     // 代码高亮
     void highlightCodeBlock(int commandIndex);
     void clearCodeHighlight();
-    void applyCodeTextStyles();
-    void addCommentTextStyles(QList<QTextEdit::ExtraSelection>& selections) const;
+    void applyMainCodeStyle();
+    void applySideCodeStyle(SideCodeState& state);
+    void applyLineTextStyle(QPlainTextEdit* editor, const QSet<int>& lines,
+                            const QColor& color, bool bold = true);
+    void addCommentStyle(QPlainTextEdit* editor,
+                         QList<QTextEdit::ExtraSelection>& selections) const;
 
-    // 日志
+    void clearSideExecutionHighlight();
+    void setSideExecutionHighlight(const CodeRange& range);
+    void syncSideExecutionHighlightWithActiveCode();
+    void clearSideChangeHighlight();
+    void enqueueSideChangeHighlight(Side side, const QSet<int>& lines);
+    void startNextSideChangeHighlight();
+
+    // 日志 / 工具
     void appendLog(const QString& text);
     void clearLogs();
     void refreshLogUi();
-
-    // 工具
-    QRect geometryInCentral(QWidget* widget) const;
     void setControlsEnabled(bool enabled);
+
+    QRect geometryInCentral(QWidget* widget) const;
+    void setScaledPixmap(QLabel* label,
+                         const QString& resourcePath,
+                         Qt::AspectRatioMode mode = Qt::KeepAspectRatio);
+    void applyActorImageStyle(QLabel* label, const QColor& glowColor, int blurRadius);
+    void applyResourceIconStyle(QLabel* label, const QColor& glowColor, int blurRadius, bool circular = false);
+    void applyResourceCountStyle(QLabel* label, const QColor& glowColor);
     Enemy* firstAliveEnemy() const;
     QString formatCardText(const CardView& card) const;
+    QString cardKindText(const CardView& card) const;
+    QString cardCodePreview(const CardView& card) const;
+    QString cardCodeHtml(const CardView& card) const;
+    QString cardAccentColor(const CardView& card) const;
+    QString cardToolTipText(const CardView& card) const;
+    QString cardButtonStyle(const QString& accent, bool playable) const;
+    void updateCardButtonStyle(QPushButton* button, const CardView& card, bool playable);
+    QString statusTypeText(StatusType type) const;
+    QString buildStatusSummary(const std::vector<Status>& statuses) const;
+    QString buildBossSpecialSkillText(Enemy* enemy) const;
+    QString toQString(const std::string& s) const;
+    QStringList toQStringList(const std::vector<std::string>& lines) const;
+    QStringList makeTickStatusesBlock(const QStringList& bodyLines) const;
+    QStringList makeTickStatusesBlock(const std::vector<std::string>& bodyLines) const;
+    QSet<int> allLineNumbers(QPlainTextEdit* editor) const;
+    QSet<int> changedBodyLines(const QStringList& oldBody,
+                               const QStringList& newBody) const;
 };
 
 #endif // MAINWINDOW_H

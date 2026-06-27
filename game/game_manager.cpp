@@ -764,3 +764,36 @@ QStringList GameManager::buildEnemyCodeLines(Enemy* enemy) const {
     return {QString("// enemy_action"),
             QString("%1.takeTurn(player);").arg(QString::fromStdString(enemy->name))};
 }
+
+
+// ============================================================
+// Qt 只读视图：奖励交换界面使用
+// MainWindow 不直接访问 unique_ptr<Card>，只拿 CardView 显示。
+// ============================================================
+
+QVector<CardView> GameManager::getCardCollectionView()
+{
+    QVector<CardView> result;
+    for (const auto& card : cardCollection) {
+        if (card) {
+            result.push_back(makeCardViewFromCard(card.get()));
+        } else {
+            result.push_back({});
+        }
+    }
+    return result;
+}
+
+QVector<CardView> GameManager::getNodeRewardView()
+{
+    QVector<CardView> result;
+    for (const auto& card : nodeRewards) {
+        if (card) {
+            result.push_back(makeCardViewFromCard(card.get()));
+        } else {
+            result.push_back({});
+        }
+    }
+    return result;
+}
+

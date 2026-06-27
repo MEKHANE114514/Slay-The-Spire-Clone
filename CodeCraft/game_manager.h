@@ -154,6 +154,10 @@ public:
     static int cardCollectionSize() { return static_cast<int>(cardCollection.size()); }
     static int nodeRewardsSize()   { return static_cast<int>(nodeRewards.size()); }
 
+    // Qt 奖励交换界面只读视图：不暴露 / 不复制 unique_ptr<Card>
+    static QVector<CardView> getCardCollectionView();
+    static QVector<CardView> getNodeRewardView();
+
     // ============================================================
     // 玩家持久化状态（跨节点保留血量）
     // ============================================================

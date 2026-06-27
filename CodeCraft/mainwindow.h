@@ -83,6 +83,8 @@ private:
 
     QWidget* gameOverOverlay = nullptr;
     QWidget* helpOverlay = nullptr;
+    QWidget* mapOverlay = nullptr;
+    QWidget* rewardOverlay = nullptr;
 
     int activeCodeIndex = -1;
     int executionToken = 0;
@@ -113,6 +115,12 @@ private:
     void showGameOverMessage();
     void showGameResultOverlay(bool playerWin);
     void hideGameResultOverlay();
+    void showMapOverlay();
+    void hideMapOverlay();
+    void showRewardOverlay();
+    void hideRewardOverlay();
+    void finishRewardAndShowMap();
+    void enterMapNode(int nodeId);
     void showHelpOverlay();
     void hideHelpOverlay();
 

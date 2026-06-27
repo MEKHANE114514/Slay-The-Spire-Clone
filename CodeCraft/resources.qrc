@@ -7,5 +7,12 @@
         <file>images/draw_pile.png</file>
         <file>images/discard_pile.png</file>
         <file>images/energy.png</file>
+
+        <file>images/enemy_goblin.png</file>
+        <file>images/enemy_fire_goblin.png</file>
+        <file>images/enemy_frozen_goblin.png</file>
+        <file>images/enemy_caster.png</file>
+        <file>images/enemy_template_king.png</file>
+        <file>images/enemy_exception_lord.png</file>
     </qresource>
 </RCC>
