@@ -675,6 +675,10 @@ std::vector<std::string> DefendCard::getCodeLines() const {
     return {"player.shield += 10;"};
 }
 
+std::vector<std::string> FortressCard::getCodeLines() const {
+    return {"player.shield += 20;"};
+}
+
 std::vector<std::string> FortifyCard::getCodeLines() const {
     return {"player.shield += 15;"};
 }
