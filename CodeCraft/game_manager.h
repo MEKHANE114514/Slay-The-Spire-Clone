@@ -27,6 +27,12 @@ struct MapNode {
     bool isBoss = false;                      // 是否为 Boss 节点
     std::vector<std::string> enemyTypes;      // 敌人类型名称列表
     std::vector<std::unique_ptr<Card>> rewardCards; // 通关后的奖励牌（3张，地图生成时确定）
+
+    MapNode() = default;
+    MapNode(MapNode&&) = default;
+    MapNode& operator=(MapNode&&) = default;
+    MapNode(const MapNode&) = delete;
+    MapNode& operator=(const MapNode&) = delete;
 };
 
 // ============================================================
@@ -41,6 +47,12 @@ struct GameMap {
     std::vector<std::vector<int>> edges;
     int startNodeId = -1;
     int bossNodeId = -1;
+
+    GameMap() = default;
+    GameMap(GameMap&&) = default;
+    GameMap& operator=(GameMap&&) = default;
+    GameMap(const GameMap&) = delete;
+    GameMap& operator=(const GameMap&) = delete;
 
     const MapNode* getNode(int id) const {
         for (auto& n : nodes)
