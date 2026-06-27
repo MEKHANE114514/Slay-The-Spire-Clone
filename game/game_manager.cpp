@@ -469,7 +469,10 @@ void GameManager::initDeck() {
     }
 
     // 洗牌
-    std::random_shuffle(drawPile.begin(), drawPile.end());
+    {
+        std::mt19937 rng(static_cast<unsigned>(time(nullptr)));
+        std::shuffle(drawPile.begin(), drawPile.end(), rng);
+    }
 }
 
 // ============================================================
@@ -640,7 +643,10 @@ void GameManager::recycleDiscardToDrawPile() {
     discardPile.clear();
 
     // 洗牌
-    std::random_shuffle(drawPile.begin(), drawPile.end());
+    {
+        std::mt19937 rng(static_cast<unsigned>(time(nullptr)));
+        std::shuffle(drawPile.begin(), drawPile.end(), rng);
+    }
 }
 
 PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
