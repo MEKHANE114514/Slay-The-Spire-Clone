@@ -520,6 +520,25 @@ void BloodSacrificeCard::play(Player& player, Enemy* target) {
     }
 }
 
+void FortressCard::play(Player& player, Enemy* /*target*/) {
+    player.addShield(20);
+}
+
+void EmergencyDodgeCard::play(Player& player, Enemy* /*target*/) {
+    Status dodge;
+    dodge.type = StatusType::DODGE;
+    dodge.value = 1;
+    dodge.turnsRemaining = 1;
+    player.addStatus(dodge);
+}
+
+void QuickCopyCard::play(Player& player, Enemy* /*target*/) {
+    if (player.minions.size() < 2 && !player.minions.empty()) {
+        Minion copy = player.copySummon(player.minions[0]);
+        player.addMinion(std::move(copy));
+    }
+}
+
 void LambdaCard::play(Player& player, Enemy* target) {
     // Lambda 注入：创建临时效果
     player.addShield(5);
