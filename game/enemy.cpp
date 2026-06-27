@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
+#include "game_text.h"
 
 // ============================================================
 // 生存
@@ -81,6 +82,60 @@ void Enemy::tickStatuses() {
     // 回调
     if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp, hp - oldHp);
     if (!isAlive() && onDeath)       onDeath();
+}
+
+std::vector<std::string> Enemy::getStatusesCode() const {
+    std::vector<std::string> lines;
+    for (const auto& s : statuses) {
+        std::string effect;
+        switch (s.type) {
+            case StatusType::BURN:
+                effect = "hp-=" + std::to_string(s.value);
+                break;
+            case StatusType::POISON:
+                effect = "hp-=" + std::to_string(s.value) + "(↑)";
+                break;
+            case StatusType::REGEN:
+                effect = "hp+=" + std::to_string(s.value);
+                break;
+            case StatusType::STRENGTH:
+                effect = "atk+=" + std::to_string(s.value);
+                break;
+            case StatusType::WEAKEN:
+                effect = "atk-=" + std::to_string(s.value);
+                break;
+            case StatusType::VULNERABLE:
+                effect = "dmgTaken+" + std::to_string(s.value) + "%";
+                break;
+            case StatusType::FREEZE:
+            case StatusType::STUN:
+                effect = "skip";
+                break;
+            case StatusType::FORTIFY:
+                effect = "onHit:shield+=" + std::to_string(s.value);
+                break;
+            case StatusType::RAGE:
+                effect = "onHit:atk+=" + std::to_string(s.value);
+                break;
+            case StatusType::DODGE:
+                effect = "dodge " + std::to_string(s.value) + "%";
+                break;
+            case StatusType::INVINCIBLE:
+                effect = "immune";
+                break;
+            case StatusType::MARK:
+                effect = "dmgTaken+" + std::to_string(s.value) + "%";
+                break;
+            default:
+                effect = "?";
+                break;
+        }
+        std::string turns = (s.turnsRemaining > 0)
+            ? std::to_string(s.turnsRemaining) + "回合"
+            : "永久";
+        lines.push_back(effect + " //" + statusName(s.type) + "，" + turns);
+    }
+    return lines;
 }
 
 // ============================================================
