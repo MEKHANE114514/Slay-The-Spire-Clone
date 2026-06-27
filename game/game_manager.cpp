@@ -10,6 +10,11 @@
 int GameManager::currentLevel = 1;
 GameMap GameManager::currentMap;
 int GameManager::currentNodeId = -1;
+std::vector<std::unique_ptr<Card>> GameManager::cardCollection;
+std::vector<std::unique_ptr<Card>> GameManager::nodeRewards;
+int GameManager::persistentHp = DEFAULT_MAX_HP;
+int GameManager::persistentMaxHp = DEFAULT_MAX_HP;
+bool GameManager::persistentStateValid = false;
 
 namespace {
 CardView makeCardViewFromCard(const Card* card)
@@ -43,6 +48,13 @@ GameManager::GameManager(int nodeId)
     }
 
     initLevel();
+
+    // 恢复持久化的血量（非首战时）
+    if (persistentStateValid) {
+        player.hp = persistentHp;
+        player.maxHp = persistentMaxHp;
+    }
+
     initDeck();
 }
 
@@ -57,6 +69,58 @@ std::unique_ptr<Enemy> GameManager::createEnemyByName(const std::string& name) {
     if (name == "Caster")        return std::make_unique<Caster>();
     if (name == "TemplateKing")  return std::make_unique<TemplateKing>();
     if (name == "ExceptionLord") return std::make_unique<ExceptionLord>();
+    return nullptr;
+}
+
+// ============================================================
+// 卡牌工厂：根据名称字符串创建卡牌实例
+// ============================================================
+
+std::unique_ptr<Card> GameManager::createCardByName(const std::string& name) {
+    // ---- 函数牌：攻击类 ----
+    if (name == "AttackEnhanceCard")    return std::make_unique<AttackEnhanceCard>();
+    if (name == "VampireAttackCard")    return std::make_unique<VampireAttackCard>();
+    if (name == "ComboAttackCard")      return std::make_unique<ComboAttackCard>();
+    if (name == "CritAttackCard")       return std::make_unique<CritAttackCard>();
+    if (name == "PoisonAttackCard")     return std::make_unique<PoisonAttackCard>();
+    if (name == "BurnAttackCard")       return std::make_unique<BurnAttackCard>();
+    if (name == "ExecuteAttackCard")    return std::make_unique<ExecuteAttackCard>();
+    if (name == "SynergyAttackCard")    return std::make_unique<SynergyAttackCard>();
+    if (name == "BerserkerAttackCard")  return std::make_unique<BerserkerAttackCard>();
+    if (name == "MarkAttackCard")       return std::make_unique<MarkAttackCard>();
+
+    // ---- 函数牌：防御类 ----
+    if (name == "IronWallCard")         return std::make_unique<IronWallCard>();
+    if (name == "CounterDamageCard")    return std::make_unique<CounterDamageCard>();
+    if (name == "RegenerationCard")     return std::make_unique<RegenerationCard>();
+    if (name == "DodgeCard")            return std::make_unique<DodgeCard>();
+    if (name == "ThornsCard")           return std::make_unique<ThornsCard>();
+    if (name == "RageCard")             return std::make_unique<RageCard>();
+    if (name == "FortifyCard")          return std::make_unique<FortifyCard>();
+
+    // ---- 函数牌：召唤/复制/移动/献祭/逃跑类 ----
+    if (name == "EnhancedSummonCard")   return std::make_unique<EnhancedSummonCard>();
+    if (name == "EliteSummonCard")      return std::make_unique<EliteSummonCard>();
+    if (name == "PreciseCopyCard")      return std::make_unique<PreciseCopyCard>();
+    if (name == "ProliferateCopyCard")  return std::make_unique<ProliferateCopyCard>();
+    if (name == "RemainsMoveCard")      return std::make_unique<RemainsMoveCard>();
+    if (name == "InheritSacrificeCard") return std::make_unique<InheritSacrificeCard>();
+    if (name == "RearguardEscapeCard")  return std::make_unique<RearguardEscapeCard>();
+
+    // ---- 指令牌 ----
+    if (name == "PowerStrikeCard")      return std::make_unique<PowerStrikeCard>();
+    if (name == "SweepCard")            return std::make_unique<SweepCard>();
+    if (name == "DefendCard")           return std::make_unique<DefendCard>();
+    if (name == "FortressCard")         return std::make_unique<FortressCard>();
+    if (name == "EmergencyDodgeCard")   return std::make_unique<EmergencyDodgeCard>();
+    if (name == "HealCard")             return std::make_unique<HealCard>();
+    if (name == "PurifyCard")           return std::make_unique<PurifyCard>();
+    if (name == "StrengthCard")         return std::make_unique<StrengthCard>();
+    if (name == "SummonCard")           return std::make_unique<SummonCard>();
+    if (name == "QuickCopyCard")        return std::make_unique<QuickCopyCard>();
+    if (name == "SacrificeCard")        return std::make_unique<SacrificeCard>();
+    if (name == "BloodSacrificeCard")   return std::make_unique<BloodSacrificeCard>();
+
     return nullptr;
 }
 
@@ -200,7 +264,6 @@ void GameManager::generateMap(int seed) {
         start.id = nextId++;
         start.depth = 0;
         start.isStart = true;
-        start.displayName = QStringLiteral("起点");
         currentMap.nodes.push_back(start);
         currentMap.startNodeId = start.id;
         layerNodes[0].push_back(start.id);
@@ -222,7 +285,17 @@ void GameManager::generateMap(int seed) {
             node.id = nextId++;
             node.depth = layer;
             node.enemyTypes = enemyTypes;
-            node.displayName = QString();
+            // 为每个战斗节点预生成 3 张奖励牌（用同一 RNG 保证确定性）
+            {
+                auto rewardPool = getRewardCardPool(depthRatio);
+                for (int r = 0; r < 3; ++r) {
+                    int ridx = rng() % rewardPool.size();
+                    auto card = createCardByName(rewardPool[ridx]);
+                    if (card) {
+                        node.rewardCards.push_back(std::move(card));
+                    }
+                }
+            }
             currentMap.nodes.push_back(node);
             layerNodes[layer].push_back(node.id);
         }
@@ -236,7 +309,6 @@ void GameManager::generateMap(int seed) {
         boss.depth = totalDepth;
         boss.isBoss = true;
         boss.enemyTypes = {bossType};
-        boss.displayName = QString();
         currentMap.nodes.push_back(boss);
         currentMap.bossNodeId = boss.id;
         layerNodes[totalDepth].push_back(boss.id);
@@ -287,17 +359,123 @@ void GameManager::generateMap(int seed) {
 }
 
 // ============================================================
-// 牌组初始化（基础牌组）
+// 卡牌库：初始 15 张起始卡牌
+// ============================================================
+
+void GameManager::initCardCollection() {
+    cardCollection.clear();
+
+    // 基础卡牌（共 13 张）
+    for (int i = 0; i < 3; ++i) cardCollection.push_back(std::make_unique<PowerStrikeCard>());
+    for (int i = 0; i < 3; ++i) cardCollection.push_back(std::make_unique<DefendCard>());
+    for (int i = 0; i < 2; ++i) cardCollection.push_back(std::make_unique<AttackEnhanceCard>());
+    for (int i = 0; i < 2; ++i) cardCollection.push_back(std::make_unique<HealCard>());
+    for (int i = 0; i < 2; ++i) cardCollection.push_back(std::make_unique<StrengthCard>());
+    cardCollection.push_back(std::make_unique<SummonCard>());
+    // 再加 2 张凑满 15
+    cardCollection.push_back(std::make_unique<PoisonAttackCard>());
+    cardCollection.push_back(std::make_unique<BurnAttackCard>());
+}
+
+// ============================================================
+// 玩家持久化状态
+// ============================================================
+
+void GameManager::savePlayerHp(int hp, int maxHp) {
+    persistentHp = hp;
+    persistentMaxHp = maxHp;
+    persistentStateValid = true;
+}
+
+void GameManager::resetPlayerState() {
+    persistentHp = DEFAULT_MAX_HP;
+    persistentMaxHp = DEFAULT_MAX_HP;
+    persistentStateValid = false;
+}
+
+// ============================================================
+// 节点奖励：根据深度生成 3 张奖励牌
+// ============================================================
+
+namespace {
+
+// depthRatio → 卡牌名称池
+std::vector<std::string> getRewardCardPool(double ratio) {
+    // 前期：基础卡
+    std::vector<std::string> pool = {
+        "PowerStrikeCard", "DefendCard", "AttackEnhanceCard",
+        "HealCard", "StrengthCard", "SummonCard",
+        "PoisonAttackCard", "BurnAttackCard"
+    };
+    // 中期：加入进阶卡
+    if (ratio >= 0.30) {
+        pool.insert(pool.end(), {
+            "VampireAttackCard", "ComboAttackCard", "CritAttackCard",
+            "SynergyAttackCard", "IronWallCard", "CounterDamageCard",
+            "DodgeCard", "ThornsCard", "EnhancedSummonCard",
+            "FortressCard", "SweepCard", "PurifyCard"
+        });
+    }
+    // 后期：加入稀有卡
+    if (ratio >= 0.60) {
+        pool.insert(pool.end(), {
+            "ExecuteAttackCard", "BerserkerAttackCard", "MarkAttackCard",
+            "RegenerationCard", "RageCard", "FortifyCard",
+            "EliteSummonCard", "PreciseCopyCard", "ProliferateCopyCard",
+            "RemainsMoveCard", "InheritSacrificeCard",
+            "QuickCopyCard", "BloodSacrificeCard", "EmergencyDodgeCard"
+        });
+    }
+    return pool;
+}
+
+} // anonymous namespace
+
+void GameManager::prepareNodeRewards() {
+    nodeRewards.clear();
+
+    const MapNode* node = currentMap.getNode(currentNodeId);
+    if (!node || node->rewardCards.empty()) return;
+
+    // 从节点中移走奖励牌（节点只访问一次，之后这些牌不再需要）
+    MapNode* mutableNode = const_cast<MapNode*>(node);
+    nodeRewards = std::move(mutableNode->rewardCards);
+}
+
+// ============================================================
+// 卡牌交换：奖励牌 ↔ 固定卡牌库
+// ============================================================
+
+bool GameManager::exchangeCard(int rewardIdx, int poolIdx) {
+    if (rewardIdx < 0 || rewardIdx >= static_cast<int>(nodeRewards.size()))
+        return false;
+    if (poolIdx < 0 || poolIdx >= static_cast<int>(cardCollection.size()))
+        return false;
+
+    std::swap(nodeRewards[rewardIdx], cardCollection[poolIdx]);
+    return true;
+}
+
+// ============================================================
+// 牌组初始化：从 cardCollection 拷贝到 drawPile
 // ============================================================
 
 void GameManager::initDeck() {
-    // 每种基础卡牌各放几张
-    for (int i = 0; i < 3; ++i) drawPile.push_back(std::make_unique<PowerStrikeCard>());
-    for (int i = 0; i < 3; ++i) drawPile.push_back(std::make_unique<DefendCard>());
-    for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<AttackEnhanceCard>());
-    for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<HealCard>());
-    for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<StrengthCard>());
-    drawPile.push_back(std::make_unique<SummonCard>());
+    // 如果 cardCollection 为空（未调用 initCardCollection），回退到旧逻辑
+    if (cardCollection.empty()) {
+        for (int i = 0; i < 3; ++i) drawPile.push_back(std::make_unique<PowerStrikeCard>());
+        for (int i = 0; i < 3; ++i) drawPile.push_back(std::make_unique<DefendCard>());
+        for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<AttackEnhanceCard>());
+        for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<HealCard>());
+        for (int i = 0; i < 2; ++i) drawPile.push_back(std::make_unique<StrengthCard>());
+        drawPile.push_back(std::make_unique<SummonCard>());
+    } else {
+        for (auto& card : cardCollection) {
+            if (card) {
+                drawPile.push_back(std::unique_ptr<Card>(card->clone()));
+            }
+        }
+    }
 
     // 洗牌
     std::random_shuffle(drawPile.begin(), drawPile.end());
