@@ -26,7 +26,7 @@ struct MapNode {
     bool isStart = false;                     // 是否为起点（无战斗）
     bool isBoss = false;                      // 是否为 Boss 节点
     std::vector<std::string> enemyTypes;      // 敌人类型名称列表
-    QString displayName;                      // UI 显示名称，如"战斗·普通"
+    std::vector<std::unique_ptr<Card>> rewardCards; // 通关后的奖励牌（3张，地图生成时确定）
 };
 
 // ============================================================
@@ -123,6 +123,38 @@ public:
     static void setLevel(int level) { currentLevel = level; }
     static int getLevel() { return currentLevel; }
 
+    // ============================================================
+    // 卡牌库系统（静态，跨实例，一次 run 中共享）
+    // ============================================================
+    static constexpr int MAX_COLLECTION_SIZE = 15;
+    static std::vector<std::unique_ptr<Card>> cardCollection;  // 固定卡牌库（≤15张）
+    static std::vector<std::unique_ptr<Card>> nodeRewards;     // 节点奖励牌（3张）
+
+    // 开局时调用一次，初始化 15 张起始卡牌
+    static void initCardCollection();
+
+    // 节点结束后调用，将当前地图节点的 rewardCards 移入 nodeRewards
+    static void prepareNodeRewards();
+
+    // 交换：rewardIdx(0~2) ↔ poolIdx(0~cardCollectionSize-1)
+    static bool exchangeCard(int rewardIdx, int poolIdx);
+
+    static int cardCollectionSize() { return static_cast<int>(cardCollection.size()); }
+    static int nodeRewardsSize()   { return static_cast<int>(nodeRewards.size()); }
+
+    // ============================================================
+    // 玩家持久化状态（跨节点保留血量）
+    // ============================================================
+    static int persistentHp;            // 对局间保留的血量
+    static int persistentMaxHp;         // 对局间保留的最大血量
+    static bool persistentStateValid;   // 是否有有效的持久化状态
+
+    // 新游戏开始时重置
+    static void resetPlayerState();
+
+    // 战斗结束时保存当前血量
+    static void savePlayerHp(int hp, int maxHp);
+
     Player player;
     BattleContext battle;
     int turnNumber = 0;
@@ -178,6 +210,9 @@ private:
 
     // ---- 敌人工厂：根据名称字符串创建敌人实例 ----
     static std::unique_ptr<Enemy> createEnemyByName(const std::string& name);
+
+    // ---- 卡牌工厂：根据名称字符串创建卡牌实例 ----
+    static std::unique_ptr<Card> createCardByName(const std::string& name);
 
     // ---- 代码执行模式内部 ----
     enum class CommandSource { PLAYER, MINION, ENEMY, END };
