@@ -16,8 +16,7 @@ int GameManager::persistentHp = DEFAULT_MAX_HP;
 int GameManager::persistentMaxHp = DEFAULT_MAX_HP;
 bool GameManager::persistentStateValid = false;
 
-namespace {
-CardView makeCardViewFromCard(const Card* card)
+static CardView makeCardViewFromCard(const Card* card)
 {
     CardView view;
     if (!card) {
@@ -185,10 +184,8 @@ void GameManager::initLevel() {
 // 地图生成
 // ============================================================
 
-namespace {
-
 // 根据深度比例返回该层可选的敌人类型池
-std::vector<std::string> getEnemyPoolForDepthRatio(double ratio) {
+static std::vector<std::string> getEnemyPoolForDepthRatio(double ratio) {
     if (ratio < 0.15) {
         // 第一层战斗：简单
         return {"Goblin"};
@@ -210,7 +207,7 @@ std::vector<std::string> getEnemyPoolForDepthRatio(double ratio) {
 }
 
 // 根据深度比例决定该节点敌人数量
-int getEnemyCountForDepthRatio(double ratio, std::mt19937& rng) {
+static int getEnemyCountForDepthRatio(double ratio, std::mt19937& rng) {
     if (ratio < 0.15) return 1;
     if (ratio < 0.40) {
         // 前期 1-2 个
@@ -225,7 +222,7 @@ int getEnemyCountForDepthRatio(double ratio, std::mt19937& rng) {
 }
 
 // 随机从池中选取 count 个敌人类型
-std::vector<std::string> pickEnemiesFromPool(
+static std::vector<std::string> pickEnemiesFromPool(
     const std::vector<std::string>& pool, int count, std::mt19937& rng)
 {
     std::vector<std::string> result;
@@ -239,11 +236,39 @@ std::vector<std::string> pickEnemiesFromPool(
 }
 
 // 根据种子选择 Boss 类型
-std::string pickBossType(int seed) {
+static std::string pickBossType(int seed) {
     return (seed % 2 == 0) ? "TemplateKing" : "ExceptionLord";
 }
 
-} // anonymous namespace
+// depthRatio → 卡牌名称池
+static std::vector<std::string> getRewardCardPool(double ratio) {
+    // 前期：基础卡
+    std::vector<std::string> pool = {
+        "PowerStrikeCard", "DefendCard", "AttackEnhanceCard",
+        "HealCard", "StrengthCard", "SummonCard",
+        "PoisonAttackCard", "BurnAttackCard"
+    };
+    // 中期：加入进阶卡
+    if (ratio >= 0.30) {
+        pool.insert(pool.end(), {
+            "VampireAttackCard", "ComboAttackCard", "CritAttackCard",
+            "SynergyAttackCard", "IronWallCard", "CounterDamageCard",
+            "DodgeCard", "ThornsCard", "EnhancedSummonCard",
+            "FortressCard", "SweepCard", "PurifyCard"
+        });
+    }
+    // 后期：加入稀有卡
+    if (ratio >= 0.60) {
+        pool.insert(pool.end(), {
+            "ExecuteAttackCard", "BerserkerAttackCard", "MarkAttackCard",
+            "RegenerationCard", "RageCard", "FortifyCard",
+            "EliteSummonCard", "PreciseCopyCard", "ProliferateCopyCard",
+            "RemainsMoveCard", "InheritSacrificeCard",
+            "QuickCopyCard", "BloodSacrificeCard", "EmergencyDodgeCard"
+        });
+    }
+    return pool;
+}
 
 void GameManager::generateMap(int seed) {
     std::mt19937 rng(static_cast<unsigned>(seed));
@@ -394,42 +419,8 @@ void GameManager::resetPlayerState() {
 }
 
 // ============================================================
-// 节点奖励：根据深度生成 3 张奖励牌
+// 节点奖励：实例化当前节点的 rewardCards
 // ============================================================
-
-namespace {
-
-// depthRatio → 卡牌名称池
-std::vector<std::string> getRewardCardPool(double ratio) {
-    // 前期：基础卡
-    std::vector<std::string> pool = {
-        "PowerStrikeCard", "DefendCard", "AttackEnhanceCard",
-        "HealCard", "StrengthCard", "SummonCard",
-        "PoisonAttackCard", "BurnAttackCard"
-    };
-    // 中期：加入进阶卡
-    if (ratio >= 0.30) {
-        pool.insert(pool.end(), {
-            "VampireAttackCard", "ComboAttackCard", "CritAttackCard",
-            "SynergyAttackCard", "IronWallCard", "CounterDamageCard",
-            "DodgeCard", "ThornsCard", "EnhancedSummonCard",
-            "FortressCard", "SweepCard", "PurifyCard"
-        });
-    }
-    // 后期：加入稀有卡
-    if (ratio >= 0.60) {
-        pool.insert(pool.end(), {
-            "ExecuteAttackCard", "BerserkerAttackCard", "MarkAttackCard",
-            "RegenerationCard", "RageCard", "FortifyCard",
-            "EliteSummonCard", "PreciseCopyCard", "ProliferateCopyCard",
-            "RemainsMoveCard", "InheritSacrificeCard",
-            "QuickCopyCard", "BloodSacrificeCard", "EmergencyDodgeCard"
-        });
-    }
-    return pool;
-}
-
-} // anonymous namespace
 
 void GameManager::prepareNodeRewards() {
     nodeRewards.clear();
