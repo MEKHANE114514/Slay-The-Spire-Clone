@@ -646,7 +646,7 @@ void GameManager::prepareEndCodeBlock() {
         cmd.title = QStringLiteral("玩家状态结算");
         cmd.lines = {"player.tickStatuses();  // 灼烧/中毒/再生"};
         cmd.source = CommandSource::END;
-        cmd.effect = [this]() { player.tickStatuses(); };
+        cmd.effect = [this]() { if (!player.isAlive()) return; player.tickStatuses(); };
         pendingCommands.push_back(std::move(cmd));
     }
     // 仆从状态结算（倒序）
@@ -658,7 +658,15 @@ void GameManager::prepareEndCodeBlock() {
         cmd.title = QString::fromStdString(raw->name);
         cmd.lines = {QString("%1.tickStatuses();").arg(cmd.title)};
         cmd.source = CommandSource::MINION;
-        cmd.effect = [raw]() { if (raw->isAlive()) raw->tickStatuses(); };
+        cmd.effect = [this, raw]() {
+            // 确认仆从仍在存活列表中（可能已被其他效果击杀并移除）
+            bool found = false;
+            for (auto& m : player.minions) {
+                if (&m == raw) { found = true; break; }
+            }
+            if (!found || !raw->isAlive()) return;
+            raw->tickStatuses();
+        };
         pendingCommands.push_back(std::move(cmd));
     }
     // 敌人状态结算（倒序）
@@ -669,7 +677,15 @@ void GameManager::prepareEndCodeBlock() {
         cmd.title = QString::fromStdString(e->name);
         cmd.lines = {QString("%1.tickStatuses();").arg(cmd.title)};
         cmd.source = CommandSource::ENEMY;
-        cmd.effect = [raw = e.get()]() { if (raw->isAlive()) raw->tickStatuses(); };
+        cmd.effect = [this, raw = e.get()]() {
+            // 确认敌人仍在存活列表中（可能已被其他效果击杀并移除）
+            bool found = false;
+            for (auto& ep : battle.enemies) {
+                if (ep.get() == raw) { found = true; break; }
+            }
+            if (!found || !raw->isAlive()) return;
+            raw->tickStatuses();
+        };
         pendingCommands.push_back(std::move(cmd));
     }
 }
@@ -774,6 +790,7 @@ PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
     cmd.title = view.name;
     cmd.lines = lines;
     cmd.effect = [this, rawCard, targetName]() {
+        if (!player.isAlive()) return;
         Enemy* resolvedTarget = targetName.empty()
             ? nullptr
             : findAliveEnemyByName(battle, targetName);
