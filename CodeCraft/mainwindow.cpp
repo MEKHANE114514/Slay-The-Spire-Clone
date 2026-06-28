@@ -73,6 +73,30 @@ const QString kEnergyPath     = QStringLiteral(":/images/energy.png");
 QString qstr(const QString& s) { return s; }
 QString qstr(const std::string& s) { return QString::fromStdString(s); }
 
+QString enemyIntentText(const Enemy* enemy)
+{
+    if (!enemy) {
+        return QStringLiteral("等待");
+    }
+
+    QString text = QString::fromStdString(enemy->getEnemyIntent()).trimmed();
+    if (text.isEmpty()) {
+        return QStringLiteral("等待");
+    }
+    return text;
+}
+
+QString enemyIntentSlotText(const Enemy* enemy)
+{
+    QString text = enemyIntentText(enemy);
+
+    // 小怪物槽位空间有限，多意图用换行显示，避免只看到第一段。
+    text.replace(QStringLiteral(" + "), QStringLiteral("\n+ "));
+    text.replace(QStringLiteral("；"), QStringLiteral("\n"));
+
+    return text;
+}
+
 QString enemyImagePath(const Enemy* enemy)
 {
     if (!enemy) {
@@ -145,12 +169,15 @@ QStringList tickBody(const QStringList& displayedLines)
 
 QSet<int> bodyChangesToDisplayedLines(const QSet<int>& bodyChanges,
                                       const QStringList& oldBody,
-                                      const QStringList& newBody)
+                                      const QStringList& newBody,
+                                      bool wrappedTickBlock)
 {
     QSet<int> result;
+    const int offset = wrappedTickBlock ? 1 : 0;
+
     for (int line : bodyChanges) {
         if (line >= 0 && line < newBody.size()) {
-            result.insert(line + 1); // 0 行是 tickStatuses() {
+            result.insert(line + offset);
         }
     }
 
@@ -158,6 +185,46 @@ QSet<int> bodyChangesToDisplayedLines(const QSet<int>& bodyChanges,
     if (result.isEmpty() && !oldBody.isEmpty() && newBody.isEmpty()) {
         result.insert(0);
     }
+    return result;
+}
+
+QSet<int> functionBlockLineNumbers(QPlainTextEdit* editor, const QString& functionName)
+{
+    QSet<int> result;
+    if (!editor || !editor->document()) {
+        return result;
+    }
+
+    const QString prefix = functionName + "(";
+    int startLine = -1;
+    int braceDepth = 0;
+
+    for (int i = 0; i < editor->document()->blockCount(); ++i) {
+        const QString line = editor->document()->findBlockByNumber(i).text().trimmed();
+
+        if (startLine < 0) {
+            if (line.startsWith(prefix) || line.startsWith("void " + prefix)) {
+                startLine = i;
+                braceDepth = 0;
+            } else {
+                continue;
+            }
+        }
+
+        if (startLine >= 0) {
+            result.insert(i);
+
+            for (const QChar& ch : line) {
+                if (ch == '{') ++braceDepth;
+                if (ch == '}') --braceDepth;
+            }
+
+            if (i > startLine && braceDepth <= 0) {
+                break;
+            }
+        }
+    }
+
     return result;
 }
 
@@ -3000,14 +3067,13 @@ void MainWindow::refreshEnemyUi()
         QString("当前目标：%1").arg(enemyName)
         );
 
+    const QString currentIntent = enemyIntentText(enemy);
+
     QString intentText = QString("HP %1/%2  护盾 %3  意图：%4")
                              .arg(enemy->hp)
                              .arg(enemy->maxHp)
                              .arg(enemy->shield)
-                             .arg(QString::fromStdString(enemy->nextIntent.name()));
-    if (enemy->nextIntent.value > 0) {
-        intentText += QString(" %1").arg(enemy->nextIntent.value);
-    }
+                             .arg(currentIntent);
     if (alive.size() > 1) {
         intentText += QString("  敌人 %1").arg(alive.size());
     }
@@ -3019,7 +3085,7 @@ void MainWindow::refreshEnemyUi()
             .arg(enemy->hp)
             .arg(enemy->maxHp)
             .arg(enemy->shield)
-            .arg(QString::fromStdString(enemy->nextIntent.name()))
+            .arg(currentIntent)
             .arg(alive.size())
             .arg(toQString(gameManager->getEnemyIntentText()));
     ui->enemyHpLabel->setToolTip(fullEnemyText);
@@ -3109,7 +3175,19 @@ void MainWindow::positionEnemySlots()
     }
 
     const int totalW = slotW * n + gap * qMax(0, n - 1);
-    const int stageCenter = leftLimit + (rightLimit - leftLimit) / 2;
+
+    int stageCenter = leftLimit + (rightLimit - leftLimit) / 2;
+
+    if (n == 1 && !singleBoss) {
+        // 单怪时如果完全按“玩家右侧—右代码框左侧”的中点计算，
+        // 视觉上会偏右。这里将它拉回战场中心一点，使它正对玩家右侧。
+        const int preferredSingleCenter = cw * 59 / 100;
+        stageCenter = (stageCenter + preferredSingleCenter) / 2;
+    } else if (singleBoss) {
+        // Boss 保持更居中、更有压迫感。
+        stageCenter = cw * 62 / 100;
+    }
+
     int x0 = stageCenter - totalW / 2;
     x0 = qBound(8, x0, qMax(8, cw - totalW - 8));
 
@@ -3273,7 +3351,7 @@ void MainWindow::refreshEnemySlots()
 
         auto* intent = new QLabel(root);
         intent->setAlignment(Qt::AlignCenter);
-        intent->setWordWrap(false);
+        intent->setWordWrap(true);
         intent->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         intent->setStyleSheet("QLabel { color: #A9EFFF; font-size: 10px; font-weight: 800; background: transparent; border: none; }");
 
@@ -3295,10 +3373,7 @@ void MainWindow::refreshEnemySlots()
 
         info->setText(QString::fromStdString(enemy->name));
 
-        QString intentText = QString::fromStdString(enemy->nextIntent.name());
-        if (enemy->nextIntent.value > 0) {
-            intentText += QString(" %1").arg(enemy->nextIntent.value);
-        }
+        QString intentText = enemyIntentSlotText(enemy);
         if (enemyIndex == selectedEnemyIndex) {
             intentText = "TARGET / " + intentText;
         }
@@ -3338,8 +3413,8 @@ void MainWindow::refreshEnemySlots()
             .arg(enemy->hp)
             .arg(enemy->maxHp)
             .arg(enemy->shield)
-            .arg(QString::fromStdString(enemy->nextIntent.name()).toHtmlEscaped())
-            .arg(enemy->nextIntent.value > 0 ? QString(" %1").arg(enemy->nextIntent.value) : QString())
+            .arg(enemyIntentText(enemy).toHtmlEscaped())
+            .arg(QString())
             .arg(statusHtml)
             .arg(descLines.isEmpty() ? QStringLiteral("无特殊技能") : descLines.join("<br>"));
 
@@ -3577,7 +3652,8 @@ void MainWindow::updateSideCode(Side side, const QStringList& newDisplayedLines)
         changedLines = bodyChangesToDisplayedLines(
             changedBodyLines(state.bodyLines, newBody),
             state.bodyLines,
-            newBody
+            newBody,
+            isTickBlock(newDisplayedLines)
             );
 
         if (changedLines.isEmpty()) {
@@ -3844,10 +3920,16 @@ void MainWindow::setSideExecutionHighlight(const CodeRange& range)
 
     if (!sideChangeHighlightActive) {
         if (range.callsPlayerTick) {
-            playerCode.executingLines = allLineNumbers(playerCode.editor);
+            playerCode.executingLines = functionBlockLineNumbers(playerCode.editor, QStringLiteral("tickStatuses"));
+            if (playerCode.executingLines.isEmpty()) {
+                playerCode.executingLines = allLineNumbers(playerCode.editor);
+            }
         }
         if (range.callsEnemyTick) {
-            enemyCode.executingLines = allLineNumbers(enemyCode.editor);
+            enemyCode.executingLines = functionBlockLineNumbers(enemyCode.editor, QStringLiteral("tickStatuses"));
+            if (enemyCode.executingLines.isEmpty()) {
+                enemyCode.executingLines = allLineNumbers(enemyCode.editor);
+            }
         }
     }
 
@@ -3866,10 +3948,16 @@ void MainWindow::syncSideExecutionHighlightWithActiveCode()
         const CodeRange& range = codeRanges[activeCodeIndex];
 
         if (range.callsPlayerTick) {
-            playerCode.executingLines = allLineNumbers(playerCode.editor);
+            playerCode.executingLines = functionBlockLineNumbers(playerCode.editor, QStringLiteral("tickStatuses"));
+            if (playerCode.executingLines.isEmpty()) {
+                playerCode.executingLines = allLineNumbers(playerCode.editor);
+            }
         }
         if (range.callsEnemyTick) {
-            enemyCode.executingLines = allLineNumbers(enemyCode.editor);
+            enemyCode.executingLines = functionBlockLineNumbers(enemyCode.editor, QStringLiteral("tickStatuses"));
+            if (enemyCode.executingLines.isEmpty()) {
+                enemyCode.executingLines = allLineNumbers(enemyCode.editor);
+            }
         }
     }
 
@@ -4472,8 +4560,19 @@ QStringList MainWindow::makeTickStatusesBlock(const std::vector<std::string>& bo
 
 QStringList MainWindow::makeTickStatusesBlock(const QStringList& bodyLines) const
 {
-    if (!bodyLines.isEmpty() && bodyLines.first().trimmed().contains("tickStatuses")) {
-        return bodyLines;
+    if (!bodyLines.isEmpty()) {
+        const QString first = bodyLines.first().trimmed();
+
+        // 玩家侧现在可能显示完整 player.cpp 函数区：
+        // void player.attack(enemy) { ... }
+        // void player.tickStatuses() { ... }
+        // 这种情况不能再包一层 tickStatuses()。
+        if (first.contains("tickStatuses") ||
+            first.startsWith("attack(") ||
+            first.startsWith("void ") ||
+            first.startsWith("// player.cpp")) {
+            return bodyLines;
+        }
     }
 
     QStringList result;

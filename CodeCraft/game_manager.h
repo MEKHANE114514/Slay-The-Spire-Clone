@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 #include <memory>
+#include <map>
 #include <QString>
 #include <QVector>
 #include <QStringList>
@@ -154,7 +155,8 @@ public:
     static int cardCollectionSize() { return static_cast<int>(cardCollection.size()); }
     static int nodeRewardsSize()   { return static_cast<int>(nodeRewards.size()); }
 
-    // Qt 奖励交换界面只读视图：不暴露 / 不复制 unique_ptr<Card>
+    // Qt 只读视图：奖励交换界面使用
+    // MainWindow 不能直接访问 unique_ptr<Card>，所以通过 CardView 显示。
     static QVector<CardView> getCardCollectionView();
     static QVector<CardView> getNodeRewardView();
 
@@ -243,6 +245,12 @@ private:
     QVector<PendingCodeCommand> pendingCommands;
 
     QStringList buildEnemyCodeLines(Enemy* enemy) const;
+
+    // ---- 当前玩家函数实现视图：用于把“函数改写牌”的持久效果展示出来 ----
+    void recordAttackPatchView(const Card* card);
+    std::vector<std::string> buildPlayerFunctionCodeLines() const;
+    std::map<std::string, int> attackPatchCounts;
+
     void insertPlayerCommandBeforeEnemy(PendingCodeCommand cmd);
 };
 

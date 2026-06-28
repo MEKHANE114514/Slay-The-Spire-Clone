@@ -109,6 +109,80 @@ static void disambiguateEnemyDisplayNames(BattleContext& battle)
     }
 }
 
+static bool isAttackFunctionCard(const Card* card)
+{
+    const auto* functionCard = dynamic_cast<const FunctionCard*>(card);
+    return functionCard && functionCard->target == FunctionTarget::ATTACK;
+}
+
+static QStringList makeFunctionPatchCodeLines(const Card* card)
+{
+    if (!card) {
+        return {};
+    }
+
+    return {
+        QString("installPatch(player.attack, %1);")
+            .arg(QString::fromStdString(card->name)),
+        QString("// player.attack() will be updated after execution")
+    };
+}
+
+static std::string patchNameWithCount(const std::string& name, int count)
+{
+    if (count <= 1) {
+        return name;
+    }
+    return name + " x" + std::to_string(count);
+}
+
+static std::string withStatementSemicolon(std::string line)
+{
+    // 空行、纯注释、括号行不处理。
+    auto first = line.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        return line;
+    }
+
+    std::string trimmed = line.substr(first);
+    if (trimmed.rfind("//", 0) == 0 ||
+        trimmed == "{" || trimmed == "}" ||
+        trimmed.back() == '{' || trimmed.back() == '}') {
+        return line;
+    }
+
+    // 如果有行内注释，把分号插在注释前：
+    // atk+=4 //力量 -> atk+=4; //力量
+    std::size_t commentPos = line.find("//");
+    std::size_t codeEnd = (commentPos == std::string::npos) ? line.size() : commentPos;
+
+    while (codeEnd > 0 && (line[codeEnd - 1] == ' ' || line[codeEnd - 1] == '\t')) {
+        --codeEnd;
+    }
+
+    if (codeEnd == 0) {
+        return line;
+    }
+
+    const char last = line[codeEnd - 1];
+    if (last == ';' || last == '{' || last == '}') {
+        return line;
+    }
+
+    line.insert(codeEnd, ";");
+    return line;
+}
+
+static std::vector<std::string> withStatementSemicolons(const std::vector<std::string>& lines)
+{
+    std::vector<std::string> result;
+    result.reserve(lines.size());
+    for (const std::string& line : lines) {
+        result.push_back(withStatementSemicolon(line));
+    }
+    return result;
+}
+
 GameManager::GameManager(int nodeId)
     : battle(player)
 {
@@ -572,13 +646,105 @@ void GameManager::prepareTurnCodeBlock() {
     prepareEndCodeBlock();
 }
 
+void GameManager::recordAttackPatchView(const Card* card)
+{
+    if (!isAttackFunctionCard(card)) {
+        return;
+    }
+
+    attackPatchCounts[card->name]++;
+}
+
+std::vector<std::string> GameManager::buildPlayerFunctionCodeLines() const
+{
+    std::vector<std::string> lines;
+
+    // 与右侧敌人代码框保持统一风格：不显示 void / player. 前缀。
+    // tickStatuses 放在前面，因为回合末执行 player.tickStatuses() 时应只高亮这一段。
+    lines.push_back("tickStatuses() {");
+    const std::vector<std::string> statusLines = withStatementSemicolons(battle.player.getStatusesCode());
+    if (statusLines.empty()) {
+        lines.push_back("");
+    } else {
+        for (const std::string& line : statusLines) {
+            lines.push_back("    " + line);
+        }
+    }
+    lines.push_back("}");
+
+    lines.push_back("");
+    lines.push_back("attack(enemy) {");
+    lines.push_back("    int dmg = getEffectiveAttack();");
+
+    auto countOf = [this](const std::string& name) -> int {
+        auto it = attackPatchCounts.find(name);
+        return it == attackPatchCounts.end() ? 0 : it->second;
+    };
+
+    const int enhance = countOf("攻击函数·强化");
+    const int crit    = countOf("攻击函数·暴击");
+    const int execute = countOf("攻击函数·斩杀");
+    const int synergy = countOf("攻击函数·协同");
+    const int berserk = countOf("攻击函数·狂战");
+
+    const int vampire = countOf("攻击函数·吸血");
+    const int combo   = countOf("攻击函数·连击");
+    const int poison  = countOf("攻击函数·毒击");
+    const int burn    = countOf("攻击函数·灼烧");
+    const int mark    = countOf("攻击函数·标记");
+
+    std::vector<std::string> beforeTags;
+    if (enhance > 0) beforeTags.push_back(patchNameWithCount("攻击强化", enhance));
+    if (crit > 0)    beforeTags.push_back(patchNameWithCount("暴击", crit));
+    if (execute > 0) beforeTags.push_back(patchNameWithCount("斩杀", execute));
+    if (synergy > 0) beforeTags.push_back(patchNameWithCount("协同", synergy));
+    if (berserk > 0) beforeTags.push_back(patchNameWithCount("狂战", berserk));
+
+    std::vector<std::string> onHitTags;
+    if (vampire > 0) onHitTags.push_back(patchNameWithCount("吸血", vampire));
+    if (combo > 0)   onHitTags.push_back(patchNameWithCount("连击", combo));
+    if (poison > 0)  onHitTags.push_back(patchNameWithCount("中毒", poison));
+    if (burn > 0)    onHitTags.push_back(patchNameWithCount("灼烧", burn));
+    if (mark > 0)    onHitTags.push_back(patchNameWithCount("标记", mark));
+
+    auto joinTags = [](const std::vector<std::string>& tags) -> std::string {
+        std::string text;
+        for (size_t i = 0; i < tags.size(); ++i) {
+            if (i > 0) text += ", ";
+            text += tags[i];
+        }
+        return text;
+    };
+
+    if (!beforeTags.empty()) {
+        lines.push_back("    dmg = beforeDamagePipeline(dmg);");
+        lines.push_back("    // " + joinTags(beforeTags));
+    }
+
+    lines.push_back("    enemy.takeDamage(dmg, PHYSICAL);");
+
+    if (!onHitTags.empty()) {
+        lines.push_back("    onHitPipeline(enemy, dmg);");
+        lines.push_back("    // " + joinTags(onHitTags));
+    }
+
+    if (attackPatchCounts.empty()) {
+        lines.push_back("    // no attack patches installed");
+    }
+
+    lines.push_back("}");
+
+    return lines;
+}
+
+
 std::vector<std::string> GameManager::getPlayerCodeLines() const {
-    return battle.player.getStatusesCode();
+    return buildPlayerFunctionCodeLines();
 }
 
 std::vector<std::string> GameManager::getEnemyCodeLines(Enemy* enemy) const {
     if (!enemy) return {};
-    return enemy->getStatusesCode();
+    return withStatementSemicolons(enemy->getStatusesCode());
 }
 
 std::vector<std::string> GameManager::getEnemyDescription(Enemy* enemy) const {
@@ -786,7 +952,9 @@ PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
     Card* rawCard = card;
     const std::string targetName = target ? target->name : std::string();
 
-    QStringList lines = makeTargetedCodeLines(card, target);
+    QStringList lines = isAttackFunctionCard(card)
+        ? makeFunctionPatchCodeLines(card)
+        : makeTargetedCodeLines(card, target);
     view.codeLines = lines;
 
     PendingCodeCommand cmd;
@@ -799,6 +967,10 @@ PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
             : findAliveEnemyByName(battle, targetName);
 
         rawCard->play(player, resolvedTarget);
+
+        // 函数改写牌的真实逻辑在 play() 中已经安装；
+        // 这里同步记录用于左侧 player.attack() 持久函数视图。
+        recordAttackPatchView(rawCard);
     };
 
     insertPlayerCommandBeforeEnemy(std::move(cmd));
@@ -834,10 +1006,12 @@ QVector<CardView> GameManager::getHandView() const {
 std::string GameManager::getEnemyIntentText() const {
     std::string text;
     for (auto& e : battle.enemies) {
+        if (!e || !e->isAlive()) {
+            continue;
+        }
+
         if (!text.empty()) text += "\n";
-        text += e->name + "：" + e->nextIntent.name();
-        if (e->nextIntent.value > 0)
-            text += " " + std::to_string(e->nextIntent.value);
+        text += e->name + "：" + e->getEnemyIntent();
     }
     return text.empty() ? "无敌人" : text;
 }
@@ -880,8 +1054,12 @@ void GameManager::insertPlayerCommandBeforeEnemy(PendingCodeCommand cmd) {
 QStringList GameManager::buildEnemyCodeLines(Enemy* enemy) const {
     if (!enemy)
         return {"// enemy_action", "enemy.wait();"};
-    return {QString("// enemy_action"),
-            QString("%1.takeTurn(player);").arg(QString::fromStdString(enemy->name))};
+
+    return {
+        QString("// enemy_action"),
+        QString("// intent: %1").arg(QString::fromStdString(enemy->getEnemyIntent())),
+        QString("%1.takeTurn(player);").arg(QString::fromStdString(enemy->name))
+    };
 }
 
 

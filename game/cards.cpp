@@ -36,12 +36,10 @@ std::string FunctionCard::getFunctionName(FunctionTarget ft) {
 }
 
 std::vector<std::string> FunctionCard::getCodeLines() const {
-    static const std::string names[] = {
-        "Attack", "TakeDamage", "Summon",
-        "CopySummon", "MoveSummon", "Sacrifice", "Escape"
+    return {
+        "installPatch(player." + getFunctionName(target) + ", " + name + ");",
+        "// persistent function patch"
     };
-    int idx = static_cast<int>(target);
-    return {"player.set" + names[idx] + "Func(...);  // " + name};
 }
 
 // ============================================================
@@ -62,9 +60,16 @@ Card* TemplateCard::clone() const {
 }
 
 std::vector<std::string> TemplateCard::getCodeLines() const {
-    if (wrappedCard)
-        return {"template.apply(player, enemy);  // " + name + " (" + wrappedCard->name + ")"};
-    return {"template.apply(player, enemy);  // " + name};
+    if (wrappedCard) {
+        return {
+            "applyTemplate(" + name + ", " + wrappedCard->name + ");",
+            "// modifies the wrapped function patch before installation"
+        };
+    }
+    return {
+        "applyTemplate(" + name + ");",
+        "// no wrapped function patch"
+    };
 }
 
 // ============================================================
@@ -84,11 +89,8 @@ void AttackEnhanceCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackEnhanceCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
-        "    auto enhancedMod = [mod](int atk) { return 1.5 * (mod ? mod(atk) : atk); };",
-        "    oldAttack(enemy, enhancedMod);",
-        "});"
+        "installPatch(player.attack, 攻击函数·强化);",
+        "// beforeDamagePipeline: dmg *= 1.5"
     };
 }
 
@@ -107,13 +109,8 @@ void VampireAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> VampireAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    int oldHp = enemy.hp;",
-        "    oldAttack(enemy, mod);",
-        "    int damage = oldHp - enemy.hp;",
-        "    if (damage > 0) player.heal(damage * 0.3);",
-        "});"
+        "installPatch(player.attack, 攻击函数·吸血);",
+        "// onHitPipeline: player.heal(damage * 0.30)"
     };
 }
 
@@ -129,12 +126,8 @@ void ComboAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> ComboAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    oldAttack(enemy, mod);",
-        "    int halfDmg = mod ? mod(player.getEffectiveAttack()) / 2 : player.getEffectiveAttack() / 2;",
-        "    enemy.takeDamage(halfDmg, PHYSICAL);",
-        "});"
+        "installPatch(player.attack, 攻击函数·连击);",
+        "// afterDamagePipeline: extraAttack(0.5 * dmg)"
     };
 }
 
@@ -156,14 +149,8 @@ void CritAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> CritAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    bool isCrit = (rand() \% 100) < 50;",
-        "    if (isCrit) {",
-        "        auto critMod = [mod](int atk) { return 2 * (mod ? mod(atk) : atk); };",
-        "        oldAttack(enemy, critMod);",
-        "    } else oldAttack(enemy, mod);",
-        "});"
+        "installPatch(player.attack, 攻击函数·暴击);",
+        "// beforeDamagePipeline: 30% chance dmg *= 2"
     };
 }
 
@@ -181,12 +168,8 @@ void PoisonAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> PoisonAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
-        "    oldAttack(enemy, mod);",
-        "    Status poison(POISON, 3, 5);",
-        "    for (int i = 0; i < 6; ++i) enemy.addStatus(poison);",
-        "});"
+        "installPatch(player.attack, 攻击函数·毒击);",
+        "// onHitPipeline: enemy.addStatus(POISON, 3)"
     };
 }
 
@@ -204,12 +187,8 @@ void BurnAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> BurnAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
-        "    oldAttack(enemy, mod);",
-        "    Status burn(BURN, 5, 3);",
-        "    for (int i = 1; i <= 4; ++i) enemy.addStatus(burn);",
-        "});"
+        "installPatch(player.attack, 攻击函数·灼烧);",
+        "// onHitPipeline: enemy.addStatus(BURN, 5)"
     };
 }
 
@@ -231,14 +210,8 @@ void ExecuteAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> ExecuteAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    float hpPercent = enemy.hp / enemy.maxHp;",
-        "    if (hpPercent < 0.3f) {",
-        "        auto execMod = [mod](int atk) { return 3 * (mod ? mod(atk) : atk); };",
-        "        oldAttack(enemy, execMod);",
-        "    } else oldAttack(enemy, mod);",
-        "});"
+        "installPatch(player.attack, 攻击函数·斩杀);",
+        "// beforeDamagePipeline: if enemy.hp < 30%, dmg *= 3"
     };
 }
 
@@ -256,13 +229,8 @@ void SynergyAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SynergyAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    auto synergyMod = [mod, &player](int atk) {",
-        "        return (mod ? mod(atk) : atk) + player.minions.size() * 3;",
-        "    };",
-        "    oldAttack(enemy, synergyMod);",
-        "});"
+        "installPatch(player.attack, 攻击函数·连携);",
+        "// beforeDamagePipeline: dmg += 3 * player.minions.size()"
     };
 }
 
@@ -281,14 +249,8 @@ void BerserkerAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> BerserkerAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    auto berserkMod = [mod, &player](int atk) {",
-        "        int hpLost = player.maxHp - player.hp;",
-        "        return (mod ? mod(atk) : atk) + (hpLost / 10) * 5;",
-        "    };",
-        "    oldAttack(enemy, berserkMod);",
-        "});"
+        "installPatch(player.attack, 攻击函数·狂暴);",
+        "// beforeDamagePipeline: dmg += 5 * lostHp / 10"
     };
 }
 
@@ -306,12 +268,8 @@ void MarkAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> MarkAttackCard::getCodeLines() const {
     return {
-        "auto oldAttack = player.getAttackFunc();",
-        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
-        "    oldAttack(enemy, mod);",
-        "    Status mark(MARK, 50, 3);",
-        "    enemy.addStatus(mark);",
-        "});"
+        "installPatch(player.attack, 攻击函数·标记);",
+        "// onHitPipeline: enemy.addStatus(MARK, +50%)"
     };
 }
 
@@ -329,11 +287,8 @@ void IronWallCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> IronWallCard::getCodeLines() const {
     return {
-        "auto oldTakeDamage = player.getTakeDamageFunc();",
-        "player.setTakeDamageFunc([oldTakeDamage](int dmg, DamageType type) {",
-        "    int reduced = dmg > 5 ? dmg - 5 : 0;",
-        "    oldTakeDamage(reduced, type);",
-        "});"
+        "installPatch(player.takeDamage, 受击函数·铁壁);",
+        "// damageFilter: incomingDamage = max(damage - 5, 0)"
     };
 }
 
@@ -347,11 +302,8 @@ void RegenerationCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> RegenerationCard::getCodeLines() const {
     return {
-        "auto oldTakeDamage = player.getTakeDamageFunc();",
-        "player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {",
-        "    oldTakeDamage(dmg, type);",
-        "    player.heal(3);",
-        "});"
+        "installPatch(player.takeDamage, 受击函数·回春);",
+        "// afterDamagePipeline: player.heal(3)"
     };
 }
 
@@ -619,163 +571,106 @@ void DoubleEffectCard::applyWrapper(Player& player, Enemy* target) {
 
 std::vector<std::string> DodgeCard::getCodeLines() const {
     return {
-        "auto oldTakeDamage = player.getTakeDamageFunc();",
-        "player.setTakeDamageFunc([oldTakeDamage](int dmg, DamageType type) {",
-        "    bool dodged = (rand() \% 100) < 30;",
-        "    if (!dodged) oldTakeDamage(dmg, type);",
-        "});"
+        "installPatch(player.takeDamage, 受击函数·闪避);",
+        "// damageFilter: 30% chance ignore damage"
     };
 }
 
 std::vector<std::string> RageCard::getCodeLines() const {
     return {
-        "auto oldTakeDamage = player.getTakeDamageFunc();",
-        "player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {",
-        "    oldTakeDamage(dmg, type);",
-        "    Status rage(RAGE, 5, 1);",
-        "    player.addStatus(rage);",
-        "});"
+        "installPatch(player.takeDamage, 受击函数·怒气);",
+        "// afterDamagePipeline: next attack gains +5"
     };
 }
 
 std::vector<std::string> EnhancedSummonCard::getCodeLines() const {
     return {
-        "player.setSummonFunc([]() -> Minion {",
-        "    return Minion(\"强化仆从\", 30, 8);",
-        "});"
+        "installPatch(player.summon, 召唤函数·强化);",
+        "// summonPipeline: summoned minion gains stronger stats"
     };
 }
 
 std::vector<std::string> EliteSummonCard::getCodeLines() const {
     return {
-        "player.setSummonFunc([]() -> Minion {",
-        "    return Minion(\"精英仆从\", ELITE_MINION_HP, ELITE_MINION_ATK, ELITE);",
-        "});"
+        "installPatch(player.summon, 召唤函数·精英);",
+        "// summonPipeline: return EliteMinion(HP 35, ATK 10)"
     };
 }
 
 std::vector<std::string> MassProductionCard::getCodeLines() const {
     return {
-        "auto oldSummon = player.getSummonFunc();",
-        "player.setSummonFunc([oldSummon, &player]() -> Minion {",
-        "    Minion m1 = oldSummon();",
-        "    Minion m2(\"复制\" + m1.name, m1.maxHp / 2, m1.attack / 2);",
-        "    player.addMinion(std::move(m2));",
-        "    return m1;",
-        "});"
+        "installPatch(player.summon, 召唤函数·量产);",
+        "// summonPipeline: summon additional weak minions"
     };
 }
 
 std::vector<std::string> PreciseCopyCard::getCodeLines() const {
     return {
-        "player.setCopySummonFunc([](const Minion& original) -> Minion {",
-        "    return Minion(original.name + \"精准复制\", original.maxHp * 0.9, original.attack * 0.9);",
-        "});"
+        "installPatch(player.copySummon, 复制构造·精准);",
+        "// copyPipeline: copied minion keeps 90% stats"
     };
 }
 
 std::vector<std::string> ProliferateCopyCard::getCodeLines() const {
     return {
-        "auto oldCopy = player.getCopySummonFunc();",
-        "player.setCopySummonFunc([oldCopy, &player](const Minion& original) -> Minion {",
-        "    Minion primary = oldCopy(original);",
-        "    Minion secondary(\"次级\" + primary.name, primary.maxHp / 2, primary.attack / 2);",
-        "    player.addMinion(std::move(secondary));",
-        "    return primary;",
-        "});"
+        "installPatch(player.copySummon, 复制构造·增殖);",
+        "// copyPipeline: create one extra secondary copy"
     };
 }
 
 std::vector<std::string> ExtractMoveCard::getCodeLines() const {
     return {
-        "auto oldMove = player.getMoveSummonFunc();",
-        "player.setMoveSummonFunc([oldMove, &player](Minion&& original) -> Minion {",
-        "    int energy = original.attack / 2;",
-        "    player.energy += energy;",
-        "    return oldMove(std::move(original));",
-        "});"
+        "installPatch(player.moveSummon, 移动构造·榨取);",
+        "// movePipeline: gain energy after moving minion"
     };
 }
 
 std::vector<std::string> RemainsMoveCard::getCodeLines() const {
     return {
-        "auto oldMove = player.getMoveSummonFunc();",
-        "player.setMoveSummonFunc([oldMove, &player](Minion&& original) -> Minion {",
-        "    Minion remains(\"残骸\", 5, 1);",
-        "    player.addMinion(std::move(remains));",
-        "    return oldMove(std::move(original));",
-        "});"
+        "installPatch(player.moveSummon, 移动构造·遗骸);",
+        "// movePipeline: leave a remains minion"
     };
 }
 
 std::vector<std::string> ExplodeSacrificeCard::getCodeLines() const {
     return {
-        "player.setSacrificeFunc([](Minion& m) {",
-        "    int damage = m.hp;",
-        "    // 对全体敌人造成伤害",
-        "    m.hp = 0;",
-        "});"
+        "installPatch(player.sacrifice, 献祭函数·爆裂);",
+        "// sacrificePipeline: deal damage based on sacrificed minion"
     };
 }
 
 std::vector<std::string> InheritSacrificeCard::getCodeLines() const {
     return {
-        "player.setSacrificeFunc([&player](Minion& m) {",
-        "    if (m.hasStatus(STRENGTH)) {",
-        "        for (auto& s : m.statuses) {",
-        "            if (s.type == STRENGTH) {",
-        "                player.addStatus(s);",
-        "                break;",
-        "            }",
-        "        }",
-        "    }",
-        "    m.hp = 0;",
-        "});"
+        "installPatch(player.sacrifice, 献祭函数·继承);",
+        "// sacrificePipeline: inherit status from sacrificed minion"
     };
 }
 
 std::vector<std::string> RebirthSacrificeCard::getCodeLines() const {
     return {
-        "player.setSacrificeFunc([](Minion& m) {",
-        "    bool rebirth = (rand() \% 100) < 30;",
-        "    if (rebirth) m.hp = m.maxHp / 2;",
-        "    else m.hp = 0;",
-        "});"
+        "installPatch(player.sacrifice, 献祭函数·重生);",
+        "// sacrificePipeline: 30% chance minion rebirths"
     };
 }
 
 std::vector<std::string> CunningEscapeCard::getCodeLines() const {
     return {
-        "player.setEscapeFunc([]() -> bool {",
-        "    return (rand() \% 100) < 70;",
-        "});"
+        "installPatch(player.escape, 逃逸函数·狡黠);",
+        "// escapePipeline: 70% success rate"
     };
 }
 
 std::vector<std::string> EmergencyEscapeCard::getCodeLines() const {
     return {
-        "auto oldEscape = player.getEscapeFunc();",
-        "player.setEscapeFunc([oldEscape, &player]() -> bool {",
-        "    bool success = oldEscape();",
-        "    if (!success) {",
-        "        int dmg = player.maxHp / 4;",
-        "        player.takeDamage(dmg, PHYSICAL);",
-        "    }",
-        "    return true;",
-        "});"
+        "installPatch(player.escape, 逃逸函数·应急);",
+        "// escapePipeline: escape succeeds, but failure causes self-damage"
     };
 }
 
 std::vector<std::string> RearguardEscapeCard::getCodeLines() const {
     return {
-        "auto oldEscape = player.getEscapeFunc();",
-        "player.setEscapeFunc([oldEscape, target]() -> bool {",
-        "    bool success = oldEscape();",
-        "    if (success && target) {",
-        "        target->takeDamage(10, PHYSICAL);",
-        "    }",
-        "    return success;",
-        "});"
+        "installPatch(player.escape, 逃逸函数·断后);",
+        "// escapePipeline: on success, strike target"
     };
 }
 
@@ -797,12 +692,8 @@ std::vector<std::string> FortressCard::getCodeLines() const {
 
 std::vector<std::string> FortifyCard::getCodeLines() const {
     return {
-        "auto oldTakeDamage = player.getTakeDamageFunc();",
-        "player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {",
-        "    oldTakeDamage(dmg, type);",
-        "    Status fortify(FORTIFY, 2, -1);",
-        "    player.addStatus(fortify);",
-        "});"
+        "installPatch(player.takeDamage, 受击函数·固守);",
+        "// afterDamagePipeline: player gains 2 shield"
     };
 }
 
