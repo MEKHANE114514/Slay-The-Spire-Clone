@@ -94,23 +94,45 @@ protected:
 
 class Goblin : public Enemy {
 public:
-    Goblin() : Enemy("程序猿", 30, 6) {}
+    Goblin() : Enemy("程序猿", 40, 7) {}
     void takeTurn(Player& player) override;
     std::vector<std::string> getDescription() const override;
 };
+
+// ============================================================
+// 示例敌人：炽热程序猿
+// 每回合攻击敌人
+// 奇数回合释放技能：火焰屏障，获得 10 点护盾，如果 player 在其存在护盾时攻击他，则 player 的生命值直接 -3
+// 偶数回合释放技能：燃烧，使得 player 获得 3 回合的灼烧状态
+// ============================================================
 
 class FireGoblin : public Enemy {
 public:
-    FireGoblin() : Enemy("炽热程序猿", 30, 6) {}
+    FireGoblin() : Enemy("炽热程序猿", 90, 12) {}
     void takeTurn(Player& player) override;
+    void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL) override;
     std::vector<std::string> getDescription() const override;
+private:
+    int turnCounter = 0;
+    int reflectDamageStacks = 0;  // 累积的反伤次数
 };
+
+// ===========================================================
+// 示例敌人：冰霜程序猿
+// 每回合攻击敌人
+// 奇数回合释放技能：寒冰屏障，获得 20 点护盾，如果 player 在其存在护盾时攻击它，则 player 下回合能量上限 -1
+// 偶数回合释放技能：冰冻，使 player 获得 1 回合虚弱状态，并有 50% 的概率获得一回合冻结状态
+//=============================================================
 
 class FrozenGoblin : public Enemy {
 public:
-    FrozenGoblin() : Enemy("冰霜程序猿", 30, 6) {}
+    FrozenGoblin() : Enemy("冰霜程序猿", 90, 12) {}
     void takeTurn(Player& player) override;
+    void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL) override;
     std::vector<std::string> getDescription() const override;
+private:
+    int turnCounter = 0;
+    int energyDebuffStacks = 0;  // 累积的能量削弱次数
 };
 
 // =============================================================
@@ -124,7 +146,7 @@ public:
 
 class Caster : public Enemy {
 public:
-    Caster() : Enemy("魔法师", 50, 3) {}
+    Caster() : Enemy("魔法师", 200, 3) {}
     void takeTurn(Player& player) override;
     std::vector<std::string> getDescription() const override;
 };
@@ -145,7 +167,7 @@ public:
     enum class Phase { FIRST, SECOND, THIRD };
     enum class Mode { ATTACK, DEFENSE };
 
-    TemplateKing() : Enemy("程序猿神", 200, 10) {
+    TemplateKing() : Enemy("程序猿神", 1000, 10) {
         currentPhase = Phase::FIRST;
         currentMode = Mode::ATTACK;
         turnsSinceLastSwitch = 0;
@@ -183,7 +205,7 @@ private:
 
 class ExceptionLord : public Enemy {
 public:
-    ExceptionLord() : Enemy("崩坏", 150, 8) {
+    ExceptionLord() : Enemy("崩坏", 1000, 10) {
         exceptionCount = 0;
         tryCatchActive = false;
         turnCounter = 0;

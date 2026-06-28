@@ -103,8 +103,8 @@ enum class BattlePhase {
 
 // ---- 游戏常量 ----
 
-constexpr int DEFAULT_MAX_HP     = 100;
-constexpr int DEFAULT_MAX_ENERGY = 1;   // 起始 1，每回合 +1
+constexpr int DEFAULT_MAX_HP     = 100;   // 玩家基础血量
+constexpr int DEFAULT_MAX_ENERGY = 3;     // 起始 3，每回合 +1
 constexpr int DEFAULT_HAND_SIZE  = 5;
 constexpr int MAX_HAND_SIZE      = 10;
 constexpr int MAX_MINIONS        = 5;

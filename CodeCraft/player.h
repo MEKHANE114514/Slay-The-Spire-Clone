@@ -103,7 +103,7 @@ public:
     void resetActionLimits();       // 新回合重置次数
 
     // ===== 攻击力计算 =====
-    int baseAttack = 10;            // 基础攻击力
+    int baseAttack = 9;             // 基础攻击力
     int getEffectiveAttack() const; // 考虑状态加成后的实际攻击力
 
     // ===== 仆从管理 =====
@@ -139,6 +139,8 @@ public:
     std::function<void(int dmg, DamageType)> onDamageReceived; // 受击飘字
     // 函数牌
     std::function<void(FunctionTarget)>   onFunctionModified; // 函数牌替换时播放特效
+    // 死亡
+    std::function<void()>                 onDeath;          // 死亡回调（播放动画）
 
 private:
     // ===== 7 个可被函数牌替换的核心实现 =====

@@ -141,7 +141,7 @@ public:
 // 攻击函数·暴击
 class CritAttackCard : public FunctionCard {
 public:
-    CritAttackCard() : FunctionCard("攻击函数·暴击", "30% 概率造成双倍伤害",
+    CritAttackCard() : FunctionCard("攻击函数·暴击", "50% 概率造成双倍伤害",
         2, Rarity::UNCOMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new CritAttackCard(); }
@@ -151,7 +151,7 @@ public:
 // 攻击函数·毒击
 class PoisonAttackCard : public FunctionCard {
 public:
-    PoisonAttackCard() : FunctionCard("攻击函数·毒击", "攻击附加 3 层中毒",
+    PoisonAttackCard() : FunctionCard("攻击函数·毒击", "攻击附加 6 层中毒",
         2, Rarity::COMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new PoisonAttackCard(); }
@@ -161,7 +161,7 @@ public:
 // 攻击函数·灼烧
 class BurnAttackCard : public FunctionCard {
 public:
-    BurnAttackCard() : FunctionCard("攻击函数·灼烧", "攻击附加 5 点灼烧伤害，持续 3 回合",
+    BurnAttackCard() : FunctionCard("攻击函数·灼烧", "攻击附加 3 层灼烧伤害，持续 3 回合",
         2, Rarity::COMMON, FunctionTarget::ATTACK) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new BurnAttackCard(); }
@@ -222,16 +222,6 @@ public:
     std::vector<std::string> getCodeLines() const override;
 };
 
-// 受击函数·反伤
-class CounterDamageCard : public FunctionCard {
-public:
-    CounterDamageCard() : FunctionCard("受击函数·反伤", "将 50% 伤害反弹给攻击者",
-        3, Rarity::RARE, FunctionTarget::TAKE_DAMAGE) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new CounterDamageCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
 // 受击函数·回春
 class RegenerationCard : public FunctionCard {
 public:
@@ -249,16 +239,6 @@ public:
         2, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new DodgeCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
-// 受击函数·荆棘
-class ThornsCard : public FunctionCard {
-public:
-    ThornsCard() : FunctionCard("受击函数·荆棘", "每次受击对攻击者造成 3 点反伤",
-        2, Rarity::UNCOMMON, FunctionTarget::TAKE_DAMAGE) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new ThornsCard(); }
     std::vector<std::string> getCodeLines() const override;
 };
 
@@ -436,6 +416,16 @@ public:
 // 指令牌 - 攻击类
 // ============================================================
 
+// 普通攻击
+class StrikeCard : public CommandCard {
+public:
+    StrikeCard() : CommandCard("普通攻击", "造成一次普通攻击",
+        1, Rarity::COMMON, TargetMode::SINGLE_ENEMY) {}
+    void play(Player& player, Enemy* target) override;
+    Card* clone() const override { return new StrikeCard(); }
+    std::vector<std::string> getCodeLines() const override;
+};
+
 // 全力一击
 class PowerStrikeCard : public CommandCard {
 public:
@@ -443,36 +433,6 @@ public:
         2, Rarity::COMMON, TargetMode::SINGLE_ENEMY) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new PowerStrikeCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
-// 横扫
-class SweepCard : public CommandCard {
-public:
-    SweepCard() : CommandCard("横扫", "攻击全体敌方（伤害降低至 70%）",
-        3, Rarity::UNCOMMON, TargetMode::ALL_ENEMIES) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new SweepCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
-// 连斩
-class DoubleSlashCard : public CommandCard {
-public:
-    DoubleSlashCard() : CommandCard("连斩", "连续执行两次攻击",
-        3, Rarity::UNCOMMON, TargetMode::SINGLE_ENEMY) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new DoubleSlashCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
-// 致命打击
-class LethalStrikeCard : public CommandCard {
-public:
-    LethalStrikeCard() : CommandCard("致命打击", "攻击，若击败目标则恢复 2 点能量",
-        3, Rarity::RARE, TargetMode::SINGLE_ENEMY) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new LethalStrikeCard(); }
     std::vector<std::string> getCodeLines() const override;
 };
 
@@ -513,7 +473,7 @@ public:
 // 治疗波
 class HealCard : public CommandCard {
 public:
-    HealCard() : CommandCard("治疗波", "恢复 15 点生命",
+    HealCard() : CommandCard("治疗波", "恢复 20 点生命",
         2, Rarity::COMMON, TargetMode::SELF) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new HealCard(); }
@@ -537,20 +497,10 @@ public:
 // 强化
 class StrengthCard : public CommandCard {
 public:
-    StrengthCard() : CommandCard("强化", "获得 2 点力量，持续 3 回合",
+    StrengthCard() : CommandCard("强化", "获得当前攻击力 50% 的力量，持续 3 回合",
         1, Rarity::COMMON, TargetMode::SELF) {}
     void play(Player& player, Enemy* target) override;
     Card* clone() const override { return new StrengthCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
-// 狂暴
-class BerserkerCard : public CommandCard {
-public:
-    BerserkerCard() : CommandCard("狂暴", "获得 5 点力量，持续 2 回合",
-        2, Rarity::UNCOMMON, TargetMode::SELF) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new BerserkerCard(); }
     std::vector<std::string> getCodeLines() const override;
 };
 
@@ -578,29 +528,9 @@ public:
     std::vector<std::string> getCodeLines() const override;
 };
 
-// 批量召唤
-class MassSummonCard : public CommandCard {
-public:
-    MassSummonCard() : CommandCard("批量召唤", "连续召唤 3 个仆从",
-        4, Rarity::RARE, TargetMode::NONE) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new MassSummonCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
 // ============================================================
 // 指令牌 - 献祭类
 // ============================================================
-
-// 献祭
-class SacrificeCard : public CommandCard {
-public:
-    SacrificeCard() : CommandCard("献祭", "献祭一个己方仆从",
-        0, Rarity::COMMON, TargetMode::SINGLE_ALLY) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new SacrificeCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
 
 // 血祭
 class BloodSacrificeCard : public CommandCard {
@@ -612,29 +542,9 @@ public:
     std::vector<std::string> getCodeLines() const override;
 };
 
-// 连锁引爆
-class ChainExplosionCard : public CommandCard {
-public:
-    ChainExplosionCard() : CommandCard("连锁引爆", "献祭一个仆从，对敌方全体造成其攻击力的伤害",
-        2, Rarity::UNCOMMON, TargetMode::SINGLE_ALLY) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new ChainExplosionCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
-
 // ============================================================
 // 指令牌 - 特殊类
 // ============================================================
-
-// const_cast 解除限制
-class ConstCastCard : public CommandCard {
-public:
-    ConstCastCard() : CommandCard("const_cast", "解除一个单位的限制状态（眩晕/冻结）",
-        1, Rarity::UNCOMMON, TargetMode::SINGLE_ALLY) {}
-    void play(Player& player, Enemy* target) override;
-    Card* clone() const override { return new ConstCastCard(); }
-    std::vector<std::string> getCodeLines() const override;
-};
 
 // Lambda 注入
 class LambdaCard : public CommandCard {
@@ -689,20 +599,6 @@ public:
 protected:
     TemplateCard* cloneTemplate() const override {
         return new TripleEffectCard();
-    }
-};
-
-// 模板·Const
-class ConstTemplateCard : public TemplateCard {
-public:
-    ConstTemplateCard() : TemplateCard("模板·Const", "将函数牌变为防御型（增加 5 点护盾）",
-        1, Rarity::UNCOMMON) {}
-    void applyWrapper(Player& player, Enemy* target) override;
-    std::vector<std::string> getCodeLines() const override;
-
-protected:
-    TemplateCard* cloneTemplate() const override {
-        return new ConstTemplateCard();
     }
 };
 
