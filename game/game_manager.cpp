@@ -522,7 +522,12 @@ void GameManager::prepareAttackCodeBlock() {
         cmd.lines = {QString("target = enemy[random()];"),
                      QString("target.takeDamage(%1, PHYSICAL);").arg(raw->getEffectiveAttack())};
         cmd.effect = [this, raw]() {
-            if (!raw->isAlive()) return;
+            // 确认仆从仍在存活列表中（可能已被其他效果击杀并移除）
+            bool found = false;
+            for (auto& m : player.minions) {
+                if (&m == raw) { found = true; break; }
+            }
+            if (!found || !raw->isAlive()) return;
             Enemy* t = battle.getRandomEnemy();
             if (t) t->takeDamage(raw->getEffectiveAttack(), DamageType::PHYSICAL);
         };
@@ -539,7 +544,12 @@ void GameManager::prepareAttackCodeBlock() {
         cmd.lines = buildEnemyCodeLines(e.get());
         cmd.source = CommandSource::ENEMY;
         cmd.effect = [this, raw = e.get()]() {
-            if (!raw->isAlive()) return;
+            // 确认敌人仍在存活列表中（可能已被其他效果击杀并移除）
+            bool found = false;
+            for (auto& ep : battle.enemies) {
+                if (ep.get() == raw) { found = true; break; }
+            }
+            if (!found || !raw->isAlive()) return;
             raw->takeTurn(player);
         };
         pendingCommands.push_back(std::move(cmd));
