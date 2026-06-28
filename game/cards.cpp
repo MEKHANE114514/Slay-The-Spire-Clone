@@ -83,7 +83,13 @@ void AttackEnhanceCard::play(Player& player, Enemy* target) {
 }
 
 std::vector<std::string> AttackEnhanceCard::getCodeLines() const {
-    return {"player.attack(enemy, 1.5 * dmg);"};
+    return {
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
+        "    auto enhancedMod = [mod](int atk) { return 1.5 * (mod ? mod(atk) : atk); };",
+        "    oldAttack(enemy, enhancedMod);",
+        "});"
+    };
 }
 
 void VampireAttackCard::play(Player& player, Enemy* target) {
@@ -100,7 +106,15 @@ void VampireAttackCard::play(Player& player, Enemy* target) {
 }
 
 std::vector<std::string> VampireAttackCard::getCodeLines() const {
-    return {"player.heal(0.3 * player.attack(enemy, dmg));"};
+    return {
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
+        "    int oldHp = enemy.hp;",
+        "    oldAttack(enemy, mod);",
+        "    int damage = oldHp - enemy.hp;",
+        "    if (damage > 0) player.heal(damage * 0.3);",
+        "});"
+    };
 }
 
 void ComboAttackCard::play(Player& player, Enemy* target) {
@@ -115,8 +129,12 @@ void ComboAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> ComboAttackCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "player.attack(enemy, 0.5 * dmg);"
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
+        "    oldAttack(enemy, mod);",
+        "    int halfDmg = mod ? mod(player.getEffectiveAttack()) / 2 : player.getEffectiveAttack() / 2;",
+        "    enemy.takeDamage(halfDmg, PHYSICAL);",
+        "});"
     };
 }
 
@@ -138,8 +156,14 @@ void CritAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> CritAttackCard::getCodeLines() const {
     return {
-        "if (rand() < 0.3) player.attack(enemy, 2 * dmg);",
-        "else player.attack(enemy, dmg);"
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
+        "    bool isCrit = (rand() \% 100) < 30;",
+        "    if (isCrit) {",
+        "        auto critMod = [mod](int atk) { return 2 * (mod ? mod(atk) : atk); };",
+        "        oldAttack(enemy, critMod);",
+        "    } else oldAttack(enemy, mod);",
+        "});"
     };
 }
 
@@ -157,8 +181,12 @@ void PoisonAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> PoisonAttackCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "enemy.addStatus(POISON(5, 3)); // 5 turns, 3 damage"
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
+        "    oldAttack(enemy, mod);",
+        "    Status poison(POISON, 3, 5);",
+        "    enemy.addStatus(poison);",
+        "});"
     };
 }
 
@@ -176,8 +204,12 @@ void BurnAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> BurnAttackCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "enemy.addStatus(BURN(3, 5)); // 3 turns, 5 damage"
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
+        "    oldAttack(enemy, mod);",
+        "    Status burn(BURN, 5, 3);",
+        "    enemy.addStatus(burn);",
+        "});"
     };
 }
 
@@ -199,8 +231,14 @@ void ExecuteAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> ExecuteAttackCard::getCodeLines() const {
     return {
-        "if (enemy.hp < 0.3 * enemy.maxHp) player.attack(enemy, 3 * dmg);",
-        "else player.attack(enemy, dmg);"
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
+        "    float hpPercent = enemy.hp / enemy.maxHp;",
+        "    if (hpPercent < 0.3f) {",
+        "        auto execMod = [mod](int atk) { return 3 * (mod ? mod(atk) : atk); };",
+        "        oldAttack(enemy, execMod);",
+        "    } else oldAttack(enemy, mod);",
+        "});"
     };
 }
 
@@ -217,7 +255,15 @@ void SynergyAttackCard::play(Player& player, Enemy* target) {
 }
 
 std::vector<std::string> SynergyAttackCard::getCodeLines() const {
-    return {"player.attack(enemy, dmg + 3 * player.minions.size());"};
+    return {
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
+        "    auto synergyMod = [mod, &player](int atk) {",
+        "        return (mod ? mod(atk) : atk) + player.minions.size() * 3;",
+        "    };",
+        "    oldAttack(enemy, synergyMod);",
+        "});"
+    };
 }
 
 void BerserkerAttackCard::play(Player& player, Enemy* target) {
@@ -234,7 +280,16 @@ void BerserkerAttackCard::play(Player& player, Enemy* target) {
 }
 
 std::vector<std::string> BerserkerAttackCard::getCodeLines() const {
-    return {"player.attack(enemy, dmg + 0.5 * (player.maxHp - player.hp));"};
+    return {
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
+        "    auto berserkMod = [mod, &player](int atk) {",
+        "        int hpLost = player.maxHp - player.hp;",
+        "        return (mod ? mod(atk) : atk) + (hpLost / 10) * 5;",
+        "    };",
+        "    oldAttack(enemy, berserkMod);",
+        "});"
+    };
 }
 
 void MarkAttackCard::play(Player& player, Enemy* target) {
@@ -251,8 +306,12 @@ void MarkAttackCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> MarkAttackCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "enemy.addStatus(MARK(3, 50)); // 3 turns, +50\% damage taken"
+        "auto oldAttack = player.getAttackFunc();",
+        "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
+        "    oldAttack(enemy, mod);",
+        "    Status mark(MARK, 50, 3);",
+        "    enemy.addStatus(mark);",
+        "});"
     };
 }
 
@@ -270,7 +329,11 @@ void IronWallCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> IronWallCard::getCodeLines() const {
     return {
-        "dmg = max(dmg - 5, 0);"
+        "auto oldTakeDamage = player.getTakeDamageFunc();",
+        "player.setTakeDamageFunc([oldTakeDamage](int dmg, DamageType type) {",
+        "    int reduced = dmg > 5 ? dmg - 5 : 0;",
+        "    oldTakeDamage(reduced, type);",
+        "});"
     };
 }
 
@@ -293,7 +356,11 @@ void RegenerationCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> RegenerationCard::getCodeLines() const {
     return {
-        "player.heal(3);"
+        "auto oldTakeDamage = player.getTakeDamageFunc();",
+        "player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {",
+        "    oldTakeDamage(dmg, type);",
+        "    player.heal(3);",
+        "});"
     };
 }
 
@@ -436,7 +503,7 @@ void RebirthSacrificeCard::play(Player& player, Enemy* target) {
 
 void CunningEscapeCard::play(Player& player, Enemy* target) {
     player.setEscapeFunc([]() -> bool {
-        return (rand() % 100) < 70;  // 70% 成功率
+        return (rand() % 100) < 70;  // 70\% 成功率
     });
 }
 
@@ -575,11 +642,20 @@ void DoubleEffectCard::applyWrapper(Player& player, Enemy* target) {
 // ============================================================
 
 std::vector<std::string> CounterDamageCard::getCodeLines() const {
-    return {"player.attack(enemy, 0.5 * dmg); // Counter"};
+    return {
+        "oldTakeDamage(dmg, type);",
+        "// Counter: attack source for 0.5 * dmg"
+    };
 }
 
 std::vector<std::string> DodgeCard::getCodeLines() const {
-    return {"if (rand() < 0.3) dmg = 0;"};
+    return {
+        "auto oldTakeDamage = player.getTakeDamageFunc();",
+        "player.setTakeDamageFunc([oldTakeDamage](int dmg, DamageType type) {",
+        "    bool dodged = (rand() \% 100) < 30;",
+        "    if (!dodged) oldTakeDamage(dmg, type);",
+        "});"
+    };
 }
 
 std::vector<std::string> ThornsCard::getCodeLines() const {
@@ -587,80 +663,155 @@ std::vector<std::string> ThornsCard::getCodeLines() const {
 }
 
 std::vector<std::string> RageCard::getCodeLines() const {
-    return {"player.addStatus(STRENGTH(2, dmg/10));"};
+    return {
+        "auto oldTakeDamage = player.getTakeDamageFunc();",
+        "player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {",
+        "    oldTakeDamage(dmg, type);",
+        "    Status rage(RAGE, 5, 1);",
+        "    player.addStatus(rage);",
+        "});"
+    };
 }
 
 std::vector<std::string> EnhancedSummonCard::getCodeLines() const {
-    return {"if (player.minions.size() < 2) minion = new Minion(1.5*hp, 1.5*atk);"};
+    return {
+        "player.setSummonFunc([]() -> Minion {",
+        "    return Minion(\"强化仆从\", 30, 8);",
+        "});"
+    };
 }
 
 std::vector<std::string> EliteSummonCard::getCodeLines() const {
-    return {"if (player.minions.size() < 2) minion = new EliteMinion(2*hp, 2*atk);"};
+    return {
+        "player.setSummonFunc([]() -> Minion {",
+        "    return Minion(\"精英仆从\", ELITE_MINION_HP, ELITE_MINION_ATK, ELITE);",
+        "});"
+    };
 }
 
 std::vector<std::string> MassProductionCard::getCodeLines() const {
-    return {"if (player.minions.size() < 2) minion = new Minion(0.5*hp, 0.5*atk);"};
+    return {
+        "auto oldSummon = player.getSummonFunc();",
+        "player.setSummonFunc([oldSummon, &player]() -> Minion {",
+        "    Minion m1 = oldSummon();",
+        "    Minion m2(\"复制\" + m1.name, m1.maxHp / 2, m1.attack / 2);",
+        "    player.addMinion(std::move(m2));",
+        "    return m1;",
+        "});"
+    };
 }
 
 std::vector<std::string> PreciseCopyCard::getCodeLines() const {
-    return {"if (player.minions.size() < 2) minion = original.clone(0.9);"};
+    return {
+        "player.setCopySummonFunc([](const Minion& original) -> Minion {",
+        "    return Minion(original.name + \"精准复制\", original.maxHp * 0.9, original.attack * 0.9);",
+        "});"
+    };
 }
 
 std::vector<std::string> ProliferateCopyCard::getCodeLines() const {
     return {
-        "if (player.minions.size() < 2) minion1 = original.clone();",
-        "if (player.minions.size() < 2) minion2 = minion1.clone(0.5);"
+        "auto oldCopy = player.getCopySummonFunc();",
+        "player.setCopySummonFunc([oldCopy, &player](const Minion& original) -> Minion {",
+        "    Minion primary = oldCopy(original);",
+        "    Minion secondary(\"次级\" + primary.name, primary.maxHp / 2, primary.attack / 2);",
+        "    player.addMinion(std::move(secondary));",
+        "    return primary;",
+        "});"
     };
 }
 
 std::vector<std::string> ExtractMoveCard::getCodeLines() const {
     return {
-        "player.energy += 0.5 * minion.atk;",
-        "delete minion;"
+        "auto oldMove = player.getMoveSummonFunc();",
+        "player.setMoveSummonFunc([oldMove, &player](Minion&& original) -> Minion {",
+        "    int energy = original.attack / 2;",
+        "    player.energy += energy;",
+        "    return oldMove(std::move(original));",
+        "});"
     };
 }
 
 std::vector<std::string> RemainsMoveCard::getCodeLines() const {
     return {
-        "remains = new Minion(5, 1);",
-        "delete minion;"
+        "auto oldMove = player.getMoveSummonFunc();",
+        "player.setMoveSummonFunc([oldMove, &player](Minion&& original) -> Minion {",
+        "    Minion remains(\"残骸\", 5, 1);",
+        "    player.addMinion(std::move(remains));",
+        "    return oldMove(std::move(original));",
+        "});"
     };
 }
 
 std::vector<std::string> ExplodeSacrificeCard::getCodeLines() const {
     return {
-        "player.minion.attack(enemy, minion.hp);",
-        "delete minion;"
+        "player.setSacrificeFunc([](Minion& m) {",
+        "    int damage = m.hp;",
+        "    // 对全体敌人造成伤害",
+        "    m.hp = 0;",
+        "});"
     };
 }
 
 std::vector<std::string> InheritSacrificeCard::getCodeLines() const {
     return {
-        "player.addStatus(minion.buffs);",
-        "delete minion;"
+        "player.setSacrificeFunc([&player](Minion& m) {",
+        "    if (m.hasStatus(STRENGTH)) {",
+        "        for (auto& s : m.statuses) {",
+        "            if (s.type == STRENGTH) {",
+        "                player.addStatus(s);",
+        "                break;",
+        "            }",
+        "        }",
+        "    }",
+        "    m.hp = 0;",
+        "});"
     };
 }
 
 std::vector<std::string> RebirthSacrificeCard::getCodeLines() const {
     return {
-        "if (rand() < 0.3) minion.hp = 0.5 * minion.maxHp;",
-        "else delete minion;"
+        "player.setSacrificeFunc([](Minion& m) {",
+        "    bool rebirth = (rand() \% 100) < 30;",
+        "    if (rebirth) m.hp = m.maxHp / 2;",
+        "    else m.hp = 0;",
+        "});"
     };
 }
 
 std::vector<std::string> CunningEscapeCard::getCodeLines() const {
-    return {"if (rand() < 0.7) escape();"};
+    return {
+        "player.setEscapeFunc([]() -> bool {",
+        "    return (rand() \% 100) < 70;",
+        "});"
+    };
 }
 
 std::vector<std::string> EmergencyEscapeCard::getCodeLines() const {
     return {
-        "if (!escape()) player.takeDamage(0.25 * player.maxHp);",
-        "// Always escapes"
+        "auto oldEscape = player.getEscapeFunc();",
+        "player.setEscapeFunc([oldEscape, &player]() -> bool {",
+        "    bool success = oldEscape();",
+        "    if (!success) {",
+        "        int dmg = player.maxHp / 4;",
+        "        player.takeDamage(dmg, PHYSICAL);",
+        "    }",
+        "    return true;",
+        "});"
     };
 }
 
 std::vector<std::string> RearguardEscapeCard::getCodeLines() const {
-    return {"if (!escape()) player.attack(enemy, 2 * player.baseAttack);"};
+    return {
+        "auto oldEscape = player.getEscapeFunc();",
+        "player.setEscapeFunc([oldEscape, target]() -> bool {",
+        "    bool success = oldEscape();",
+        "    if (success && target) {",
+        "        target->takeDamage(10, PHYSICAL);",
+        "    }",
+        "    return success;",
+        "});"
+    };
 }
 
 std::vector<std::string> PowerStrikeCard::getCodeLines() const {
@@ -680,7 +831,14 @@ std::vector<std::string> FortressCard::getCodeLines() const {
 }
 
 std::vector<std::string> FortifyCard::getCodeLines() const {
-    return {"player.shield += 15;"};
+    return {
+        "auto oldTakeDamage = player.getTakeDamageFunc();",
+        "player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {",
+        "    oldTakeDamage(dmg, type);",
+        "    Status fortify(FORTIFY, 2, -1);",
+        "    player.addStatus(fortify);",
+        "});"
+    };
 }
 
 std::vector<std::string> EmergencyDodgeCard::getCodeLines() const {
@@ -778,7 +936,7 @@ void AttackCritCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
     player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
         int damage = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
-        if (rand() % 100 < 30) {  // 30% 概率
+        if (rand() % 100 < 30) {  // 30\% 概率
             damage *= 2;
         }
         enemy.takeDamage(damage, DamageType::PHYSICAL);
@@ -798,13 +956,13 @@ void AttackSplashCard::play(Player& player, Enemy* target) {
     player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
         int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.takeDamage(dmg, DamageType::PHYSICAL);
-        // TODO: 对相邻敌人造成 50% 伤害（目前单敌人版本暂不实现）
+        // TODO: 对相邻敌人造成 50\% 伤害（目前单敌人版本暂不实现）
     });
 }
 
 std::vector<std::string> AttackSplashCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
+        "enemy.takeDamage(dmg, PHYSICAL);",
         "for (Enemy& adj : adjacentEnemies) adj.takeDamage(0.5 * dmg);"
     };
 }
@@ -822,8 +980,9 @@ void AttackPierceCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackPierceCard::getCodeLines() const {
     return {
-        "enemy.shield -= 0.5 * enemy.shield;  // Pierce 50% shield",
-        "player.attack(enemy, dmg);"
+        "int shieldPierce = enemy.shield / 2;",
+        "enemy.shield -= shieldPierce;",
+        "enemy.takeDamage(dmg, PHYSICAL);"
     };
 }
 
@@ -843,8 +1002,9 @@ void AttackPoisonCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackPoisonCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "enemy.addStatus(POISON(3, 3));  // 3 stacks"
+        "enemy.takeDamage(dmg, PHYSICAL);",
+        "Status poison(POISON, 3, 3);  // 3 stacks, 3 turns",
+        "enemy.addStatus(poison);"
     };
 }
 
@@ -864,8 +1024,9 @@ void AttackBurnCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackBurnCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, FIRE);",
-        "enemy.addStatus(BURN(3, 5));  // 3 turns, 5 dmg/turn"
+        "enemy.takeDamage(dmg, FIRE);",
+        "Status burn(BURN, 5, 3);  // 5 dmg/turn, 3 turns",
+        "enemy.addStatus(burn);"
     };
 }
 
@@ -875,7 +1036,7 @@ void AttackFreezeCard::play(Player& player, Enemy* target) {
     player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
         int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
         enemy.takeDamage(dmg, DamageType::ICE);
-        if (rand() % 100 < 20) {  // 20% 概率
+        if (rand() % 100 < 20) {  // 20\% 概率
             Status frozen;
             frozen.type = StatusType::FREEZE;
             frozen.value = 0;
@@ -887,8 +1048,11 @@ void AttackFreezeCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackFreezeCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, ICE);",
-        "if (rand() < 0.2) enemy.addStatus(FROZEN(1));"
+        "enemy.takeDamage(dmg, ICE);",
+        "if (rand() \% 100 < 20) {",
+        "    Status frozen(FREEZE, 0, 1);",
+        "    enemy.addStatus(frozen);",
+        "}"
     };
 }
 
@@ -904,8 +1068,10 @@ void AttackLightningCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackLightningCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, LIGHTNING);",
-        "for (Enemy& e : enemies) e.takeDamage(0.3 * dmg, LIGHTNING);"
+        "enemy.takeDamage(dmg, LIGHTNING);",
+        "for (Enemy& e : enemies) {",
+        "    e.takeDamage(0.3 * dmg, LIGHTNING);  // Chain 30\%",
+        "}"
     };
 }
 
@@ -920,7 +1086,7 @@ void AttackShadowCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackShadowCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, SHADOW);"
+        "enemy.takeDamage(dmg, SHADOW);"
     };
 }
 
@@ -936,7 +1102,7 @@ void AttackHolyCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackHolyCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, TRUE);",
+        "enemy.takeDamage(dmg, HOLY);",
         "player.heal(0.5 * dmg);"
     };
 }
@@ -953,7 +1119,7 @@ void AttackHealCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackHealCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
+        "enemy.takeDamage(dmg, PHYSICAL);",
         "player.heal(dmg / 3);"
     };
 }
@@ -974,8 +1140,8 @@ void AttackWeakenCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackWeakenCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "enemy.addStatus(WEAK(2, 25));  // -25% atk for 2 turns"
+        "enemy.takeDamage(dmg, PHYSICAL);",
+        "enemy.addStatus(WEAK(2, 25));  // -25\% atk for 2 turns"
     };
 }
 
@@ -997,8 +1163,8 @@ void AttackStunCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackStunCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "if (rand() < 0.15) enemy.addStatus(STUNNED(1));"
+        "enemy.takeDamage(dmg, PHYSICAL);",
+        "if (rand() \% 100 < 15) enemy.addStatus(STUNNED(1));"
     };
 }
 
@@ -1014,8 +1180,8 @@ void AttackEchoCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackEchoCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "player.attack(enemy, 0.5 * dmg);  // Echo"
+        "enemy.takeDamage(dmg, PHYSICAL);",
+        "enemy.takeDamage(0.5 * dmg, PHYSICAL);  // Echo"
     };
 }
 
@@ -1034,7 +1200,7 @@ void AttackChargeCard::play(Player& player, Enemy* target) {
 std::vector<std::string> AttackChargeCard::getCodeLines() const {
     return {
         "static int charge = 0; charge++;",
-        "player.attack(enemy, dmg + 5 * charge);"
+        "enemy.takeDamage(dmg + 5 * charge, PHYSICAL);"
     };
 }
 
@@ -1051,8 +1217,9 @@ void AttackSplitCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackSplitCard::getCodeLines() const {
     return {
-        "player.attack(enemy, 0.5 * dmg);",
-        "player.attack(enemy, 0.5 * dmg);"
+        "int splitDmg = dmg / 2;",
+        "enemy.takeDamage(splitDmg, PHYSICAL);",
+        "enemy.takeDamage(splitDmg, PHYSICAL);"
     };
 }
 
@@ -1069,7 +1236,9 @@ void AttackWindfuryCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackWindfuryCard::getCodeLines() const {
     return {
-        "for (int i = 0; i < 2; i++) player.attack(enemy, dmg);"
+        "for (int i = 0; i < 2; i++) {",
+        "    enemy.takeDamage(dmg, PHYSICAL);",
+        "}"
     };
 }
 
@@ -1085,7 +1254,7 @@ void AttackAbsorbCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackAbsorbCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, SHADOW);",
+        "enemy.takeDamage(dmg, SHADOW);",
         "player.shield += 0.25 * dmg;"
     };
 }
@@ -1102,7 +1271,7 @@ void AttackPrecisionCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackPrecisionCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg, TRUE);  // Ignore armor"
+        "enemy.hp -= dmg;  // Bypass shield"
     };
 }
 
@@ -1118,7 +1287,8 @@ void AttackSynergyCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackSynergyCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg + 3 * player.minions.size());"
+        "int bonus = player.minions.size() * 3;",
+        "enemy.takeDamage(dmg + bonus, PHYSICAL);"
     };
 }
 
@@ -1138,8 +1308,8 @@ void AttackMarkCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackMarkCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg);",
-        "enemy.addStatus(MARK(3, 50));  // +50% damage taken"
+        "enemy.takeDamage(dmg, PHYSICAL);",
+        "enemy.addStatus(MARK(3, 50));  // +50\% damage taken"
     };
 }
 
@@ -1157,8 +1327,8 @@ void AttackExecuteCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackExecuteCard::getCodeLines() const {
     return {
-        "if (enemy.hp < 0.3 * enemy.maxHp) player.attack(enemy, 3 * dmg);",
-        "else player.attack(enemy, dmg);"
+        "if (enemy.hp < 0.3 * enemy.maxHp) enemy.takeDamage(3 * dmg, PHYSICAL);",
+        "else enemy.takeDamage(dmg, PHYSICAL);"
     };
 }
 
@@ -1174,7 +1344,8 @@ void AttackBerserkerCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> AttackBerserkerCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg + 0.5 * (player.maxHp - player.hp));"
+        "int bonus = (player.maxHp - player.hp) / 2;",
+        "enemy.takeDamage(dmg + bonus, PHYSICAL);"
     };
 }
 
@@ -1193,7 +1364,8 @@ void DefendIronWallCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendIronWallCard::getCodeLines() const {
     return {
-        "dmg = max(0, dmg - 5);  // Reduce damage by 5"
+        "int reduced = max(0, damage - 5);",
+        "oldTakeDamage(reduced, type);"
     };
 }
 
@@ -1211,7 +1383,8 @@ void DefendReflectCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendReflectCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg / 3);  // Reflect 33%"
+        "oldTakeDamage(damage, type);",
+        "if (target) target->takeDamage(damage / 3, PHYSICAL);"
     };
 }
 
@@ -1226,7 +1399,8 @@ void DefendRegenerationCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendRegenerationCard::getCodeLines() const {
     return {
-        "player.heal(3);  // Regen on hit"
+        "oldTakeDamage(damage, type);",
+        "player.heal(3);"
     };
 }
 
@@ -1241,7 +1415,8 @@ void DefendShieldCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendShieldCard::getCodeLines() const {
     return {
-        "player.shield += blocked;"
+        "oldTakeDamage(damage, type);",
+        "player.shield += 6;"
     };
 }
 
@@ -1259,7 +1434,8 @@ void DefendDodgeCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendDodgeCard::getCodeLines() const {
     return {
-        "if (rand() < 0.25) dmg = 0;  // 25/% dodge"
+        "if (rand() \% 100 < 25) return;  // 25\% dodge",
+        "oldTakeDamage(damage, type);"
     };
 }
 
@@ -1274,7 +1450,8 @@ void DefendArmorCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendArmorCard::getCodeLines() const {
     return {
-        "dmg = dmg * 2 / 3;  // Reduce 33/%"
+        "int reduced = damage * 2 / 3;",
+        "oldTakeDamage(reduced, type);"
     };
 }
 
@@ -1289,7 +1466,8 @@ void DefendAbsorbCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendAbsorbCard::getCodeLines() const {
     return {
-        "player.heal(dmg / 5);  // Absorb 20/%"
+        "oldTakeDamage(damage, type);",
+        "player.heal(damage / 5);"
     };
 }
 
@@ -1311,9 +1489,11 @@ void DefendDistributeCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendDistributeCard::getCodeLines() const {
     return {
-        "int distributed = dmg / (player.minions.size() + 1);",
-        "for (Minion& m : player.minions) m.takeDamage(distributed);",
-        "dmg = distributed;"
+        "if (!player.minions.empty()) {",
+        "    int distributed = damage / (player.minions.size() + 1);",
+        "    oldTakeDamage(distributed, type);",
+        "    for (Minion& m : player.minions) m.takeDamage(distributed);",
+        "} else oldTakeDamage(damage, type);"
     };
 }
 
@@ -1328,7 +1508,8 @@ void DefendFortifyCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendFortifyCard::getCodeLines() const {
     return {
-        "dmg = min(dmg, 15);  // Cap at 15"
+        "int capped = min(damage, 15);",
+        "oldTakeDamage(capped, type);"
     };
 }
 
@@ -1345,7 +1526,8 @@ void DefendThornsCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> DefendThornsCard::getCodeLines() const {
     return {
-        "player.attack(enemy, dmg / 4);  // Thorns"
+        "oldTakeDamage(damage, type);",
+        "if (target) target->takeDamage(damage / 4, PHYSICAL);"
     };
 }
 
@@ -1362,7 +1544,7 @@ void SummonEnhanceCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SummonEnhanceCard::getCodeLines() const {
     return {
-        "minion = new Minion(20, 8);  // Enhanced"
+        "return Minion(\"Enhanced\", 20, 8);"
     };
 }
 
@@ -1381,9 +1563,11 @@ void SummonMassCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SummonMassCard::getCodeLines() const {
     return {
-        "while (player.minions.size() < 2) {",
-        "    player.minions.push_back(new Minion(10, 5));",
-        "}"
+        "Minion m = oldSummon();",
+        "if (player.minions.size() < 2) {",
+        "    player.addMinion(Minion(\"Mass\", 10, 5));",
+        "}",
+        "return m;"
     };
 }
 
@@ -1400,7 +1584,7 @@ void CopyPrecisionCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> CopyPrecisionCard::getCodeLines() const {
     return {
-        "minion = original.clone();  // Perfect copy"
+        "return Minion(original);"
     };
 }
 
@@ -1419,8 +1603,11 @@ void CopyMultiplyCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> CopyMultiplyCard::getCodeLines() const {
     return {
-        "minion1 = original.clone();",
-        "minion2 = original.clone(0.5);  // 50\% stats"
+        "Minion copy1 = oldCopy(original);",
+        "if (player.minions.size() < 2) {",
+        "    player.addMinion(Minion(original.name, original.hp / 2, original.attack / 2));",
+        "}",
+        "return copy1;"
     };
 }
 
@@ -1433,7 +1620,7 @@ void CopyImproveCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> CopyImproveCard::getCodeLines() const {
     return {
-        "minion = original.clone(1.2);  // +20\% stats"
+        "return Minion(original.name, original.hp * 1.2, original.attack * 1.2);"
     };
 }
 
@@ -1452,8 +1639,8 @@ void MoveExtractCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> MoveExtractCard::getCodeLines() const {
     return {
-        "player.energy += minion.atk / 2;",
-        "delete minion;"
+        "player.energy += minion.attack / 2;",
+        "return oldMove(std::move(minion));"
     };
 }
 
@@ -1468,8 +1655,8 @@ void MoveRemnantsCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> MoveRemnantsCard::getCodeLines() const {
     return {
-        "corpse = new Minion(5, 0);  // Leave remains",
-        "delete minion;"
+        "player.addMinion(Minion(\"Corpse\", 5, 0));",
+        "return oldMove(std::move(minion));"
     };
 }
 
@@ -1485,7 +1672,7 @@ void MoveResonanceCard::play(Player& player, Enemy* target) {
 std::vector<std::string> MoveResonanceCard::getCodeLines() const {
     return {
         "player.shield += minion.hp / 2;",
-        "delete minion;"
+        "return oldMove(std::move(minion));"
     };
 }
 
@@ -1506,8 +1693,8 @@ void SacrificeExplodeCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SacrificeExplodeCard::getCodeLines() const {
     return {
-        "player.minion.attack(enemy, minion.hp);",
-        "delete minion;"
+        "oldSacrifice(minion);",
+        "if (target) target->takeDamage(minion.hp, FIRE);"
     };
 }
 
@@ -1522,8 +1709,8 @@ void SacrificeInheritCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SacrificeInheritCard::getCodeLines() const {
     return {
-        "player.atk += minion.atk;",
-        "delete minion;"
+        "oldSacrifice(minion);",
+        "player.baseAttack += minion.attack;"
     };
 }
 
@@ -1540,8 +1727,10 @@ void SacrificeRebornCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> SacrificeRebornCard::getCodeLines() const {
     return {
-        "if (rand() < 0.3) minion.hp = 0.5 * minion.maxHp;",
-        "else delete minion;  // 30% rebirth"
+        "oldSacrifice(minion);",
+        "if (rand() \% 100 < 30) {",
+        "    player.addMinion(Minion(minion.name, minion.hp / 2, minion.attack));",
+        "}"
     };
 }
 
@@ -1558,7 +1747,7 @@ void EscapeNimbleCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> EscapeNimbleCard::getCodeLines() const {
     return {
-        "if (rand() < 0.7) escape();  // 70\% success"
+        "return (rand() \% 100) < 70;  // 70\% success rate"
     };
 }
 
@@ -1581,9 +1770,12 @@ void EscapeMoltCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> EscapeMoltCard::getCodeLines() const {
     return {
-        "if (!escape()) {",
-        "    player.addStatus(MOLT(1, 50));  // Take 50\% damage",
-        "}"
+        "bool success = oldEscape();",
+        "if (!success) {",
+        "    Status molt(FORTIFY, 50, 1);",
+        "    player.addStatus(molt);",
+        "}",
+        "return success;"
     };
 }
 
@@ -1601,6 +1793,10 @@ void EscapeRearguardCard::play(Player& player, Enemy* target) {
 
 std::vector<std::string> EscapeRearguardCard::getCodeLines() const {
     return {
-        "if (escape()) player.attack(enemy, 2 * player.baseAttack);"
+        "bool success = oldEscape();",
+        "if (success && target) {",
+        "    player.attack(*target, [](int atk) { return atk * 2; });",
+        "}",
+        "return success;"
     };
 }
