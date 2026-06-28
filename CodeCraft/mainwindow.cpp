@@ -24,6 +24,7 @@
 #include <QRandomGenerator>
 #include <QPropertyAnimation>
 #include <QPixmap>
+#include <QPointer>
 #include <QScrollBar>
 #include <QTextBlock>
 #include <QTextBrowser>
@@ -103,6 +104,17 @@ QString enemyImagePath(const Enemy* enemy)
     }
 
     return kEnemyPath;
+}
+
+bool isBossEnemy(const Enemy* enemy)
+{
+    if (!enemy) {
+        return false;
+    }
+
+    const QString name = QString::fromStdString(enemy->name);
+    return name.contains(QStringLiteral("程序猿神"))
+           || name.contains(QStringLiteral("崩坏"));
 }
 
 bool isTickBlock(const QStringList& lines)
@@ -424,6 +436,7 @@ MainWindow::MainWindow(QWidget *parent)
     initCharacterContrast();
     initResourceContrast();
     initOverlays();
+    initSpeedButton();
 
     // 等 MainWindow 完成 show()、事件循环启动后再弹 seed 输入框。
     // 这样“输入 seed → 生成地图 → 显示地图”的流程更自然。
@@ -462,6 +475,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
     }
 
     positionTitleLabel();
+    positionSpeedButton();
     positionEnemySlots();
     positionOverlays();
 }
@@ -487,6 +501,7 @@ void MainWindow::positionOverlays()
     const QRect rect = ui->centralwidget->rect();
 
     positionTitleLabel();
+    positionSpeedButton();
     positionEnemySlots();
 
     if (startOverlay) {
@@ -549,6 +564,152 @@ void MainWindow::positionTitleLabel()
     ui->titleLabel->setGeometry((w - titleW) / 2, 4, titleW, 28);
     ui->titleLabel->setAlignment(Qt::AlignCenter);
     ui->titleLabel->raise();
+}
+
+
+
+void MainWindow::initSpeedButton()
+{
+    if (!ui || !ui->centralwidget || speedButton) {
+        return;
+    }
+
+    speedButton = new QPushButton(ui->centralwidget);
+    speedButton->setObjectName("speedButton");
+    speedButton->setCursor(Qt::PointingHandCursor);
+    speedButton->setCheckable(true);
+    speedButton->setToolTip(QStringLiteral("切换动画速度。加速模式会缩短代码执行等待、卡牌飞行动画、受击/浮字动画和滚动动画。"));
+    connect(speedButton, &QPushButton::clicked, this, [this]() {
+        toggleFastMode();
+    });
+
+    updateSpeedButtonUi();
+    positionSpeedButton();
+    speedButton->raise();
+}
+
+void MainWindow::positionSpeedButton()
+{
+    if (!ui || !ui->centralwidget || !speedButton) {
+        return;
+    }
+
+    const bool coverOverlayActive = (startOverlay != nullptr) || (seedOverlay != nullptr);
+    speedButton->setVisible(!coverOverlayActive);
+    if (coverOverlayActive) {
+        return;
+    }
+
+    const int w = 132;
+    const int h = 34;
+
+    // 上一版把加速按钮放在“结束回合”左侧，容易压到手牌区。
+    // 这版改放到右侧日志框上方，属于“系统控制区”，不会和手牌重叠。
+    int x = ui->centralwidget->width() - w - 28;
+    int y = 92;
+
+    if (ui->logTextEdit) {
+        QRect logRect = geometryInCentral(ui->logTextEdit);
+        if (logRect.isValid() && logRect.width() > 0) {
+            x = logRect.right() - w;
+            y = logRect.top() - h - 10;
+
+            // 如果窗口高度变化导致日志框上方空间不足，则退回到右上角状态区下方。
+            if (y < 120) {
+                y = 120;
+            }
+        }
+    }
+
+    // 避免压到右上角 boss 技能按钮。
+    if (ui->bossSkillLabel) {
+        QRect bossRect = geometryInCentral(ui->bossSkillLabel);
+        if (bossRect.isValid() && QRect(x, y, w, h).intersects(bossRect.adjusted(-8, -8, 8, 8))) {
+            y = bossRect.bottom() + 12;
+        }
+    }
+
+    x = qBound(8, x, qMax(8, ui->centralwidget->width() - w - 8));
+    y = qBound(38, y, qMax(38, ui->centralwidget->height() - h - 8));
+
+    speedButton->setGeometry(x, y, w, h);
+    speedButton->raise();
+}
+
+void MainWindow::updateSpeedButtonUi()
+{
+    if (!speedButton) {
+        return;
+    }
+
+    speedButton->setChecked(fastMode);
+    speedButton->setText(fastMode ? QStringLiteral("⚡ 2x 加速中") : QStringLiteral("▶ 1x 正常"));
+
+    speedButton->setStyleSheet(fastMode
+        ? QStringLiteral(
+            "QPushButton#speedButton {"
+            "background-color: rgba(72, 44, 8, 238);"
+            "color: #FFF2C2;"
+            "border: 2px solid rgba(255, 209, 102, 245);"
+            "border-radius: 10px;"
+            "font-size: 13px;"
+            "font-weight: 900;"
+            "padding: 5px 8px;"
+            "}"
+            "QPushButton#speedButton:hover {"
+            "background-color: rgba(98, 62, 12, 245);"
+            "border: 2px solid #FFFFFF;"
+            "}"
+        )
+        : QStringLiteral(
+            "QPushButton#speedButton {"
+            "background-color: rgba(8, 18, 34, 230);"
+            "color: #D7F7FF;"
+            "border: 1px solid rgba(105, 235, 255, 170);"
+            "border-radius: 10px;"
+            "font-size: 13px;"
+            "font-weight: 850;"
+            "padding: 5px 8px;"
+            "}"
+            "QPushButton#speedButton:hover {"
+            "background-color: rgba(18, 48, 70, 235);"
+            "border: 1px solid #FFFFFF;"
+            "}"
+        )
+    );
+}
+
+void MainWindow::toggleFastMode()
+{
+    fastMode = !fastMode;
+    updateSpeedButtonUi();
+
+    appendLog(fastMode
+                  ? QStringLiteral("动画加速已开启：2x。")
+                  : QStringLiteral("动画加速已关闭：1x。"));
+
+    // 如果正在滚动，切换速度后不要让旧动画继续以旧速度运行。
+    if (mainCodeScrollAnimation) {
+        mainCodeScrollAnimation->stop();
+        mainCodeScrollAnimation->deleteLater();
+        mainCodeScrollAnimation = nullptr;
+    }
+
+    if (activeCodeIndex >= 0) {
+        scrollMainCodeToActiveBlock(true);
+    }
+}
+
+int MainWindow::scaledMs(int ms) const
+{
+    if (ms <= 0) {
+        return ms;
+    }
+
+    // 不做“跳过动画”，只做速度倍率缩短，避免异步回调顺序被破坏。
+    // 0.45 约等于 2.2x，保留最小时间，防止 QTimer 过密导致 UI 状态刷新不稳定。
+    const double factor = fastMode ? 0.45 : 1.0;
+    return qMax(30, static_cast<int>(ms * factor));
 }
 
 
@@ -898,6 +1059,12 @@ void MainWindow::resetRuntimeState()
 
     ++executionToken;
     ++sideHighlightToken;
+
+    if (mainCodeScrollAnimation) {
+        mainCodeScrollAnimation->stop();
+        mainCodeScrollAnimation->deleteLater();
+        mainCodeScrollAnimation = nullptr;
+    }
 
     logs.clear();
     codeRanges.clear();
@@ -1554,7 +1721,7 @@ void MainWindow::executeNextCode(int index, int token)
         if (!sideChangeHighlightActive) {
             startNextSideChangeHighlight();
         }
-        QTimer::singleShot(SIDE_POLL_MS, this, [this, index, token]() {
+        QTimer::singleShot(scaledMs(SIDE_POLL_MS), this, [this, index, token]() {
             executeNextCode(index, token);
         });
         return;
@@ -1580,7 +1747,7 @@ void MainWindow::executeNextCode(int index, int token)
 
     highlightCodeBlock(index);
 
-    QTimer::singleShot(MAIN_EXEC_MS, this, [this, index, token]() {
+    QTimer::singleShot(scaledMs(MAIN_EXEC_MS), this, [this, index, token]() {
         if (token != executionToken || !gameManager) {
             return;
         }
@@ -1621,7 +1788,7 @@ void MainWindow::executeNextCode(int index, int token)
             return;
         }
 
-        QTimer::singleShot(MAIN_GAP_MS, this, [this, index, token]() {
+        QTimer::singleShot(scaledMs(MAIN_GAP_MS), this, [this, index, token]() {
             executeNextCode(index + 1, token);
         });
     });
@@ -1662,7 +1829,7 @@ void MainWindow::showGameOverMessage()
             ui->restartButton->setEnabled(true);
             ui->helpButton->setEnabled(true);
 
-            QTimer::singleShot(250, this, [this]() {
+            QTimer::singleShot(scaledMs(250), this, [this]() {
                 if (GameManager::getNodeRewardView().isEmpty()) {
                     finishRewardAndShowMap();
                 } else {
@@ -1993,7 +2160,7 @@ void MainWindow::showRewardOverlay()
                      formatCardText(poolView), cardToolTipText(poolView),
                      520, QEasingCurve::OutCubic, nullptr);
 
-        QTimer::singleShot(560, this, [this, state, rewardIdx, poolIdx, rebuild]() mutable {
+        QTimer::singleShot(scaledMs(560), this, [this, state, rewardIdx, poolIdx, rebuild]() mutable {
             if (!rewardOverlay) {
                 return;
             }
@@ -2054,7 +2221,7 @@ void MainWindow::finishRewardAndShowMap()
     ui->restartButton->setEnabled(true);
     ui->helpButton->setEnabled(true);
 
-    QTimer::singleShot(180, this, [this]() {
+    QTimer::singleShot(scaledMs(180), this, [this]() {
         showMapOverlay();
     });
 }
@@ -2530,18 +2697,22 @@ void MainWindow::animateActorNudge(QWidget* widget, int dx)
         return;
     }
 
+    QPointer<QWidget> safeWidget(widget);
     const QPoint origin = widget->pos();
 
-    QSequentialAnimationGroup* group = new QSequentialAnimationGroup(this);
+    // 注意：敌人槽位会在 refreshEnemySlots() 中被 deleteLater 后重建。
+    // 如果动画结束回调里继续访问旧 QWidget*，会触发 SIGSEGV。
+    // group 以 widget 为父对象，widget 被删时动画组也会一起销毁。
+    QSequentialAnimationGroup* group = new QSequentialAnimationGroup(widget);
 
     QPropertyAnimation* forward = new QPropertyAnimation(widget, "pos");
-    forward->setDuration(120);
+    forward->setDuration(scaledMs(120));
     forward->setStartValue(origin);
     forward->setEndValue(origin + QPoint(dx, 0));
     forward->setEasingCurve(QEasingCurve::OutCubic);
 
     QPropertyAnimation* back = new QPropertyAnimation(widget, "pos");
-    back->setDuration(160);
+    back->setDuration(scaledMs(160));
     back->setStartValue(origin + QPoint(dx, 0));
     back->setEndValue(origin);
     back->setEasingCurve(QEasingCurve::OutBack);
@@ -2549,11 +2720,13 @@ void MainWindow::animateActorNudge(QWidget* widget, int dx)
     group->addAnimation(forward);
     group->addAnimation(back);
 
-    connect(group, &QSequentialAnimationGroup::finished, this, [widget, origin, group]() {
-        if (widget) {
-            widget->move(origin);
+    connect(group, &QSequentialAnimationGroup::finished, this, [safeWidget, origin, group]() {
+        if (safeWidget) {
+            safeWidget->move(origin);
         }
-        group->deleteLater();
+        if (group) {
+            group->deleteLater();
+        }
     });
 
     group->start();
@@ -2565,15 +2738,16 @@ void MainWindow::animateActorShake(QWidget* widget)
         return;
     }
 
+    QPointer<QWidget> safeWidget(widget);
     const QPoint origin = widget->pos();
-    QSequentialAnimationGroup* group = new QSequentialAnimationGroup(this);
+    QSequentialAnimationGroup* group = new QSequentialAnimationGroup(widget);
 
     const QList<int> offsets = { -8, 8, -6, 6, -3, 3, 0 };
     QPoint start = origin;
 
     for (int off : offsets) {
         QPropertyAnimation* anim = new QPropertyAnimation(widget, "pos");
-        anim->setDuration(45);
+        anim->setDuration(scaledMs(45));
         anim->setStartValue(start);
         anim->setEndValue(origin + QPoint(off, 0));
         anim->setEasingCurve(QEasingCurve::Linear);
@@ -2581,11 +2755,13 @@ void MainWindow::animateActorShake(QWidget* widget)
         start = origin + QPoint(off, 0);
     }
 
-    connect(group, &QSequentialAnimationGroup::finished, this, [widget, origin, group]() {
-        if (widget) {
-            widget->move(origin);
+    connect(group, &QSequentialAnimationGroup::finished, this, [safeWidget, origin, group]() {
+        if (safeWidget) {
+            safeWidget->move(origin);
         }
-        group->deleteLater();
+        if (group) {
+            group->deleteLater();
+        }
     });
 
     group->start();
@@ -2637,13 +2813,13 @@ void MainWindow::showFloatingText(QWidget* anchor,
     QParallelAnimationGroup* group = new QParallelAnimationGroup(this);
 
     QPropertyAnimation* move = new QPropertyAnimation(label, "pos");
-    move->setDuration(800);
+    move->setDuration(scaledMs(800));
     move->setStartValue(label->pos());
     move->setEndValue(label->pos() + QPoint(0, -55));
     move->setEasingCurve(QEasingCurve::OutCubic);
 
     QPropertyAnimation* fade = new QPropertyAnimation(opacity, "opacity");
-    fade->setDuration(800);
+    fade->setDuration(scaledMs(800));
     fade->setStartValue(1.0);
     fade->setEndValue(0.0);
     fade->setEasingCurve(QEasingCurve::InCubic);
@@ -2651,9 +2827,14 @@ void MainWindow::showFloatingText(QWidget* anchor,
     group->addAnimation(move);
     group->addAnimation(fade);
 
-    connect(group, &QParallelAnimationGroup::finished, this, [label, group]() {
-        label->deleteLater();
-        group->deleteLater();
+    QPointer<QLabel> safeLabel(label);
+    connect(group, &QParallelAnimationGroup::finished, this, [safeLabel, group]() {
+        if (safeLabel) {
+            safeLabel->deleteLater();
+        }
+        if (group) {
+            group->deleteLater();
+        }
     });
 
     group->start();
@@ -2680,14 +2861,19 @@ void MainWindow::animateGhost(const QRect& startRect,
     ghost->raise();
 
     QPropertyAnimation* animation = new QPropertyAnimation(ghost, "geometry");
-    animation->setDuration(duration);
+    animation->setDuration(scaledMs(duration));
     animation->setStartValue(startRect);
     animation->setEndValue(endRect);
     animation->setEasingCurve(easing);
 
-    connect(animation, &QPropertyAnimation::finished, this, [ghost, animation, onFinished]() {
-        ghost->deleteLater();
-        animation->deleteLater();
+    QPointer<QPushButton> safeGhost(ghost);
+    connect(animation, &QPropertyAnimation::finished, this, [safeGhost, animation, onFinished]() {
+        if (safeGhost) {
+            safeGhost->deleteLater();
+        }
+        if (animation) {
+            animation->deleteLater();
+        }
         if (onFinished) {
             onFinished();
         }
@@ -2886,7 +3072,6 @@ void MainWindow::positionEnemySlots()
                          ? enemyCodeRect.left() - 34
                          : cw * 78 / 100;
 
-    // 防止窗口缩放或 ui 锚点异常导致怪物挤到边缘。
     if (rightLimit - leftLimit < 260) {
         leftLimit = cw * 46 / 100;
         rightLimit = cw * 76 / 100;
@@ -2895,11 +3080,21 @@ void MainWindow::positionEnemySlots()
     leftLimit = qBound(cw * 38 / 100, leftLimit, cw * 62 / 100);
     rightLimit = qBound(leftLimit + 260, rightLimit, cw * 82 / 100);
 
+    bool singleBoss = false;
+    if (n == 1 && !enemySlots.isEmpty()) {
+        singleBoss = isBossEnemy(enemyByIndex(enemySlots.first().enemyIndex));
+    }
+
     int slotW = 150;
     int slotH = 206;
     int gap = 38;
 
-    if (n == 1) {
+    if (singleBoss) {
+        // Boss 需要明显压迫感：单 Boss 使用更大的立绘区域。
+        slotW = qBound(210, cw * 18 / 100, 310);
+        slotH = qBound(270, ch * 38 / 100, 405);
+        gap = 0;
+    } else if (n == 1) {
         slotW = 168;
         slotH = 215;
         gap = 0;
@@ -2921,7 +3116,14 @@ void MainWindow::positionEnemySlots()
     int y = playerRect.isValid() && playerRect.height() > 0
                 ? playerRect.top() + playerRect.height() / 9
                 : ch * 43 / 100;
-    y = qBound(ch * 28 / 100, y, qMax(8, ch - slotH - 150));
+
+    if (singleBoss) {
+        y = playerRect.isValid() && playerRect.height() > 0
+                ? playerRect.top() - playerRect.height() / 15
+                : ch * 31 / 100;
+    }
+
+    y = qBound(ch * 20 / 100, y, qMax(8, ch - slotH - 128));
 
     for (int i = 0; i < enemySlots.size(); ++i) {
         if (enemySlots[i].root) {
@@ -3058,7 +3260,7 @@ void MainWindow::refreshEnemySlots()
 
         auto* image = new QLabel(root);
         image->setAlignment(Qt::AlignCenter);
-        image->setMinimumHeight(104);
+        image->setMinimumHeight(isBossEnemy(enemy) ? 190 : 104);
         image->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         image->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         image->setStyleSheet("QLabel { background: transparent; border: none; }");
@@ -3276,6 +3478,12 @@ void MainWindow::refreshMainCodeEditor()
         return;
     }
 
+    QPlainTextEdit* editor = ui->codePlainTextEdit;
+    const int oldScroll = (editor && editor->verticalScrollBar())
+                              ? editor->verticalScrollBar()->value()
+                              : 0;
+    const int oldCursor = editor ? editor->textCursor().position() : 0;
+
     QStringList lines = { "{", "    // 请在此输入代码" };
     QVector<CodeRange> ranges;
     int currentLine = 2;
@@ -3304,8 +3512,31 @@ void MainWindow::refreshMainCodeEditor()
         activeCodeIndex = -1;
     }
 
-    ui->codePlainTextEdit->setPlainText(lines.join("\n"));
+    const QString newText = lines.join("\n");
+    const bool textChanged = (editor && editor->toPlainText() != newText);
+
+    // 关键：不要每次刷新都 setPlainText。
+    // setPlainText 会重建文档并把滚动条打回顶部，这是之前“不平滑”的主要原因。
+    if (textChanged) {
+        ui->codePlainTextEdit->setPlainText(newText);
+    }
+
     applyMainCodeStyle();
+
+    if (activeCodeIndex >= 0 && activeCodeIndex < codeRanges.size()) {
+        // 即使文本刚刚重建，也使用平滑滚动定位到正在执行的代码块。
+        scrollMainCodeToActiveBlock(true);
+    } else if (editor) {
+        if (textChanged) {
+            QTextCursor cursor = editor->textCursor();
+            cursor.setPosition(qMin(oldCursor, qMax(0, editor->document()->characterCount() - 1)));
+            editor->setTextCursor(cursor);
+            if (editor->verticalScrollBar()) {
+                editor->verticalScrollBar()->setValue(oldScroll);
+            }
+        }
+    }
+
     syncSideExecutionHighlightWithActiveCode();
 }
 
@@ -3391,6 +3622,7 @@ void MainWindow::highlightCodeBlock(int commandIndex)
     }
 
     applyMainCodeStyle();
+    scrollMainCodeToActiveBlock(true);
     refreshEnemySlots();
     refreshSideCodeEditors();
     syncSideExecutionHighlightWithActiveCode();
@@ -3437,6 +3669,81 @@ void MainWindow::applyMainCodeStyle()
 
     addCommentStyle(ui->codePlainTextEdit, selections);
     ui->codePlainTextEdit->setExtraSelections(selections);
+}
+
+
+void MainWindow::scrollMainCodeToLine(int lineNumber, bool animated)
+{
+    if (!ui || !ui->codePlainTextEdit) {
+        return;
+    }
+
+    QPlainTextEdit* editor = ui->codePlainTextEdit;
+    QTextDocument* document = editor->document();
+    QTextBlock block = document->findBlockByNumber(lineNumber);
+    if (!block.isValid()) {
+        return;
+    }
+
+    QScrollBar* bar = editor->verticalScrollBar();
+    if (!bar) {
+        return;
+    }
+
+    // 旧版用 setTextCursor + centerCursor 先瞬间跳到目标，再把滚动条拉回去做动画，
+    // 视觉上会出现“抖一下 / 不够平滑”的感觉。
+    // 这里直接用 cursorRect 计算目标滚动值，不移动真实光标，不触发立即跳转。
+    QTextCursor cursor(block);
+    const QRect cursorRect = editor->cursorRect(cursor);
+
+    const int startValue = bar->value();
+    const int desiredY = qMax(24, editor->viewport()->height() / 3);
+    int targetValue = startValue + cursorRect.top() - desiredY;
+    targetValue = qBound(bar->minimum(), targetValue, bar->maximum());
+
+    const int distance = qAbs(targetValue - startValue);
+    if (!animated || distance < 2) {
+        if (mainCodeScrollAnimation) {
+            mainCodeScrollAnimation->stop();
+            mainCodeScrollAnimation->deleteLater();
+            mainCodeScrollAnimation = nullptr;
+        }
+        bar->setValue(targetValue);
+        return;
+    }
+
+    if (mainCodeScrollAnimation) {
+        mainCodeScrollAnimation->stop();
+        mainCodeScrollAnimation->deleteLater();
+        mainCodeScrollAnimation = nullptr;
+    }
+
+    mainCodeScrollAnimation = new QPropertyAnimation(bar, "value", this);
+    mainCodeScrollAnimation->setStartValue(startValue);
+    mainCodeScrollAnimation->setEndValue(targetValue);
+
+    // 距离越远，时间略长；但设上下限，避免拖沓。
+    const int duration = qBound(360, 220 + distance * 18, 820);
+    mainCodeScrollAnimation->setDuration(scaledMs(duration));
+    mainCodeScrollAnimation->setEasingCurve(QEasingCurve::InOutCubic);
+
+    connect(mainCodeScrollAnimation, &QPropertyAnimation::finished, this, [this]() {
+        if (mainCodeScrollAnimation) {
+            mainCodeScrollAnimation->deleteLater();
+            mainCodeScrollAnimation = nullptr;
+        }
+    });
+
+    mainCodeScrollAnimation->start();
+}
+
+void MainWindow::scrollMainCodeToActiveBlock(bool animated)
+{
+    if (activeCodeIndex < 0 || activeCodeIndex >= codeRanges.size()) {
+        return;
+    }
+
+    scrollMainCodeToLine(codeRanges[activeCodeIndex].startLine, animated);
 }
 
 void MainWindow::applySideCodeStyle(SideCodeState& state)
@@ -3583,13 +3890,12 @@ void MainWindow::startNextSideChangeHighlight()
         return;
     }
 
-    // 函数修改高亮期间，停止其它高亮。
-    activeCodeIndex = -1;
+    // 函数修改高亮期间，只暂停两侧执行高亮，不再清空中间 activeCodeIndex。
+    // 否则中间代码框会因为刷新失去执行位置，自动跳回前几行。
     playerCode.executingLines.clear();
     enemyCode.executingLines.clear();
     playerCode.changedLines.clear();
     enemyCode.changedLines.clear();
-    applyMainCodeStyle();
 
     const SideHighlightRequest request = sideHighlightQueue.takeFirst();
     SideCodeState& target = (request.side == Side::Player) ? playerCode : enemyCode;
@@ -3601,7 +3907,7 @@ void MainWindow::startNextSideChangeHighlight()
     applySideCodeStyle(playerCode);
     applySideCodeStyle(enemyCode);
 
-    QTimer::singleShot(SIDE_CHANGE_MS, this, [this, token]() {
+    QTimer::singleShot(scaledMs(SIDE_CHANGE_MS), this, [this, token]() {
         if (token != sideHighlightToken) {
             return;
         }

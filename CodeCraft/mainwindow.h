@@ -11,6 +11,7 @@
 #include <QEasingCurve>
 #include <QLabel>
 #include <QColor>
+#include <QPropertyAnimation>
 
 #include <functional>
 #include <memory>
@@ -97,6 +98,9 @@ private:
     QWidget* seedOverlay = nullptr;
     QWidget* startOverlay = nullptr;
 
+    QPropertyAnimation* mainCodeScrollAnimation = nullptr;
+    QPushButton* speedButton = nullptr;
+
     int activeCodeIndex = -1;
     int selectedEnemyIndex = -1;
     int inspectedEnemyIndex = -1;
@@ -105,6 +109,7 @@ private:
     int sideHighlightToken = 0;
     bool controlsEnabled = false;
     bool sideChangeHighlightActive = false;
+    bool fastMode = false;
 
     // 初始化 / 流程
     void initCardButtons();
@@ -117,6 +122,11 @@ private:
     void initOverlays();
     void positionOverlays();
     void positionTitleLabel();
+    void initSpeedButton();
+    void positionSpeedButton();
+    void updateSpeedButtonUi();
+    void toggleFastMode();
+    int scaledMs(int ms) const;
     void resetRuntimeState();
     void startNewGame();
     void beginNewGameWithSeed(int seed);
@@ -190,6 +200,8 @@ private:
     void highlightCodeBlock(int commandIndex);
     void clearCodeHighlight();
     void applyMainCodeStyle();
+    void scrollMainCodeToLine(int lineNumber, bool animated);
+    void scrollMainCodeToActiveBlock(bool animated);
     void applySideCodeStyle(SideCodeState& state);
     void applyLineTextStyle(QPlainTextEdit* editor, const QSet<int>& lines,
                             const QColor& color, bool bold = true);
