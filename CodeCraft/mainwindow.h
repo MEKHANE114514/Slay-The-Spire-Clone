@@ -69,6 +69,14 @@ private:
         QSet<int> lines;
     };
 
+    struct EnemySlotWidgets {
+        QWidget* root = nullptr;
+        QLabel* image = nullptr;
+        QLabel* info = nullptr;
+        QLabel* intent = nullptr;
+        int enemyIndex = -1;
+    };
+
 private:
     Ui::MainWindow *ui = nullptr;
     std::unique_ptr<GameManager> gameManager;
@@ -76,6 +84,7 @@ private:
     QStringList logs;
     QVector<QPushButton*> cardButtons;
     QVector<CodeRange> codeRanges;
+    QVector<EnemySlotWidgets> enemySlots;
 
     SideCodeState playerCode;
     SideCodeState enemyCode;
@@ -87,6 +96,9 @@ private:
     QWidget* rewardOverlay = nullptr;
 
     int activeCodeIndex = -1;
+    int selectedEnemyIndex = -1;
+    int inspectedEnemyIndex = -1;
+    int executingEnemyIndex = -1;
     int executionToken = 0;
     int sideHighlightToken = 0;
     bool controlsEnabled = false;
@@ -154,6 +166,10 @@ private:
     void refreshUi();
     void refreshPlayerUi();
     void refreshEnemyUi();
+    void refreshEnemySlots();
+    void clearEnemySlots();
+    void positionEnemySlots();
+    void updateEnemySlotStyles();
     void refreshPileUi();
     void refreshHandUi();
     void refreshMinionUi();
@@ -193,6 +209,15 @@ private:
     void applyResourceIconStyle(QLabel* label, const QColor& glowColor, int blurRadius, bool circular = false);
     void applyResourceCountStyle(QLabel* label, const QColor& glowColor);
     Enemy* firstAliveEnemy() const;
+    Enemy* enemyByIndex(int index) const;
+    Enemy* selectedEnemy() const;
+    Enemy* inspectedEnemy() const;
+    QVector<int> aliveEnemyIndexes() const;
+    int enemyIndexOf(Enemy* enemy) const;
+    int enemyIndexFromCommand(const CodeCommandView& command) const;
+    void ensureSelectedEnemyValid();
+    void setSelectedEnemyIndex(int index);
+    QWidget* enemyAnchorWidget(int enemyIndex) const;
     QString formatCardText(const CardView& card) const;
     QString cardKindText(const CardView& card) const;
     QString cardCodePreview(const CardView& card) const;

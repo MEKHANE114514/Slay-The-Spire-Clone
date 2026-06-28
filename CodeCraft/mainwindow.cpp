@@ -459,6 +459,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
         setScaledPixmap(ui->minionImageLabel2, kMinionPath);
     }
 
+    positionEnemySlots();
     positionOverlays();
 }
 
@@ -476,6 +477,8 @@ void MainWindow::positionOverlays()
     }
 
     const QRect rect = ui->centralwidget->rect();
+
+    positionEnemySlots();
 
     if (gameOverOverlay) {
         gameOverOverlay->setGeometry(rect);
@@ -701,6 +704,7 @@ void MainWindow::initImageAssets()
     setScaledPixmap(ui->playerImageLabel, kPlayerPath);
     setScaledPixmap(ui->enemyImageLabel, kEnemyGoblinPath);
     ui->enemyImageLabel->setProperty("portraitPath", kEnemyGoblinPath);
+    ui->enemyImageLabel->hide();
     setScaledPixmap(ui->minionImageLabel1, kMinionPath);
     setScaledPixmap(ui->minionImageLabel2, kMinionPath);
 
@@ -832,8 +836,12 @@ void MainWindow::resetRuntimeState()
     logs.clear();
     codeRanges.clear();
     sideHighlightQueue.clear();
+    clearEnemySlots();
 
     activeCodeIndex = -1;
+    selectedEnemyIndex = -1;
+    inspectedEnemyIndex = -1;
+    executingEnemyIndex = -1;
     controlsEnabled = false;
     sideChangeHighlightActive = false;
 
@@ -1055,8 +1063,9 @@ void MainWindow::playCardByIndex(int index)
         return;
     }
 
+    ensureSelectedEnemyValid();
     CardView card = handView[index];
-    PlayResult result = gameManager->playCardAsCode(index, firstAliveEnemy());
+    PlayResult result = gameManager->playCardAsCode(index, selectedEnemy());
 
     if (!result.success) {
         appendLog(QString("无法写入代码：%1").arg(qstr(result.failReason)));
@@ -1147,24 +1156,34 @@ void MainWindow::executeNextCode(int index, int token)
             return;
         }
 
-        const int oldPlayerHp = gameManager->player.hp;
-        const int oldPlayerShield = gameManager->player.shield;
-
-        Enemy* oldEnemy = firstAliveEnemy();
-        const int oldEnemyHp = oldEnemy ? oldEnemy->hp : 0;
-        const int oldEnemyShield = oldEnemy ? oldEnemy->shield : 0;
-
         CodeCommandView command;
         const QVector<CodeCommandView> commands = gameManager->getCodeCommandViews();
         if (index >= 0 && index < commands.size()) {
             command = commands[index];
         }
 
+        int commandEnemyIndex = enemyIndexFromCommand(command);
+        if (commandEnemyIndex >= 0) {
+            executingEnemyIndex = commandEnemyIndex;
+            inspectedEnemyIndex = commandEnemyIndex;
+            refreshEnemySlots();
+            refreshSideCodeEditors();
+        }
+
+        const int oldPlayerHp = gameManager->player.hp;
+        const int oldPlayerShield = gameManager->player.shield;
+
+        Enemy* oldEnemy = (commandEnemyIndex >= 0) ? enemyByIndex(commandEnemyIndex) : selectedEnemy();
+        const int oldEnemyHp = oldEnemy ? oldEnemy->hp : 0;
+        const int oldEnemyShield = oldEnemy ? oldEnemy->shield : 0;
+
         gameManager->executePendingCode(index);
         refreshUi();
         refreshMainCodeEditor();
         playCommandFeedback(command, oldPlayerHp, oldPlayerShield, oldEnemyHp, oldEnemyShield);
 
+        // 如果当前命令不是敌人相关命令，执行高亮只维持主代码块；
+        // 如果是敌人命令，executingEnemyIndex 会在下一条命令或 clearCodeHighlight() 时更新/清除。
         const bool noAliveEnemy = (firstAliveEnemy() == nullptr);
         const bool playerAlive = gameManager->player.isAlive();
         if (gameManager->isBattleOver() || (playerAlive && noAliveEnemy)) {
@@ -1730,6 +1749,10 @@ void MainWindow::enterMapNode(int nodeId)
 {
     resetRuntimeState();
     gameManager = std::make_unique<GameManager>(nodeId);
+    selectedEnemyIndex = -1;
+    inspectedEnemyIndex = -1;
+    executingEnemyIndex = -1;
+    ensureSelectedEnemyValid();
 
     const MapNode* node = GameManager::getCurrentMapNode();
     const QString nodeName = node ? mapNodeButtonText(*node).replace("\n", " ") : QStringLiteral("未知节点");
@@ -2007,7 +2030,9 @@ void MainWindow::playCommandFeedback(const CodeCommandView& command,
     const bool looksLikeHeal = commandText.contains("heal") || commandText.contains("治疗") || commandText.contains("regen") || commandText.contains("再生");
     const bool looksLikeShield = commandText.contains("shield") || commandText.contains("defend") || commandText.contains("防御") || commandText.contains("护盾");
 
-    Enemy* enemy = firstAliveEnemy();
+    const int visualEnemyIndex = (executingEnemyIndex >= 0) ? executingEnemyIndex : selectedEnemyIndex;
+    Enemy* enemy = enemyByIndex(visualEnemyIndex);
+    QWidget* enemyWidget = enemyAnchorWidget(visualEnemyIndex);
     const int newPlayerHp = gameManager->player.hp;
     const int newPlayerShield = gameManager->player.shield;
     const int newEnemyHp = enemy ? enemy->hp : oldEnemyHp;
@@ -2027,16 +2052,16 @@ void MainWindow::playCommandFeedback(const CodeCommandView& command,
         animateActorNudge(ui->playerImageLabel, 28);
     }
     if (enemyDidMove && playerHpDelta < 0) {
-        animateActorNudge(ui->enemyImageLabel, -28);
+        animateActorNudge(enemyWidget, -28);
     }
 
     if (enemyHpDelta < 0) {
-        animateActorShake(ui->enemyImageLabel);
-        showFloatingText(ui->enemyImageLabel,
+        animateActorShake(enemyWidget);
+        showFloatingText(enemyWidget,
                          QString("-%1").arg(-enemyHpDelta),
                          looksLikePoison || looksLikeTick ? kPoisonTextColor : kDamageTextColor);
     } else if (enemyHpDelta > 0) {
-        showFloatingText(ui->enemyImageLabel,
+        showFloatingText(enemyWidget,
                          QString("+%1").arg(enemyHpDelta),
                          kHealTextColor);
     }
@@ -2063,7 +2088,7 @@ void MainWindow::playCommandFeedback(const CodeCommandView& command,
     }
 
     if (enemyShieldDelta > 0) {
-        showFloatingText(ui->enemyImageLabel,
+        showFloatingText(enemyWidget,
                          QString("护盾 +%1").arg(enemyShieldDelta),
                          kShieldTextColor);
     }
@@ -2305,8 +2330,10 @@ void MainWindow::refreshUi()
         return;
     }
 
+    ensureSelectedEnemyValid();
     refreshPlayerUi();
     refreshEnemyUi();
+    refreshEnemySlots();
     refreshPileUi();
     refreshHandUi();
     refreshMinionUi();
@@ -2339,30 +2366,339 @@ void MainWindow::refreshPlayerUi()
 
 void MainWindow::refreshEnemyUi()
 {
-    Enemy* enemy = firstAliveEnemy();
+    ensureSelectedEnemyValid();
+    Enemy* enemy = selectedEnemy();
 
     if (!enemy) {
         ui->enemyHpLabel->setText("敌人生命：无");
+        ui->enemyIntentLabel->setText("敌人意图：无");
         ui->bossSkillLabel->setText("Boss 技能：无");
         ui->bossSkillLabel->setToolTip("");
         return;
     }
 
+    const QVector<int> alive = aliveEnemyIndexes();
+
+    const QString enemyName = QString::fromStdString(enemy->name);
     ui->enemyHpLabel->setText(
-        QString("%1  生命：%2/%3")
-            .arg(QString::fromStdString(enemy->name))
+        QString("当前目标：%1").arg(enemyName)
+        );
+
+    QString intentText = QString("HP %1/%2  护盾 %3  意图：%4")
+                             .arg(enemy->hp)
+                             .arg(enemy->maxHp)
+                             .arg(enemy->shield)
+                             .arg(QString::fromStdString(enemy->nextIntent.name()));
+    if (enemy->nextIntent.value > 0) {
+        intentText += QString(" %1").arg(enemy->nextIntent.value);
+    }
+    if (alive.size() > 1) {
+        intentText += QString("  敌人 %1").arg(alive.size());
+    }
+    ui->enemyIntentLabel->setText(intentText);
+
+    const QString fullEnemyText =
+        QString("当前目标：%1\n生命：%2/%3\n护盾：%4\n意图：%5\n存活敌人：%6\n\n全部敌人意图：\n%7")
+            .arg(enemyName)
             .arg(enemy->hp)
             .arg(enemy->maxHp)
-        );
+            .arg(enemy->shield)
+            .arg(QString::fromStdString(enemy->nextIntent.name()))
+            .arg(alive.size())
+            .arg(toQString(gameManager->getEnemyIntentText()));
+    ui->enemyHpLabel->setToolTip(fullEnemyText);
+    ui->enemyIntentLabel->setToolTip(fullEnemyText);
 
-    ui->enemyIntentLabel->setText(
-        toQString(gameManager->getEnemyIntentText())
-        );
-
-    // bossSkillLabel 只作为“技能卡片入口”显示，完整技能说明通过美化后的 ToolTip 展示。
-    ui->bossSkillLabel->setText("Boss 技能");
+    // bossSkillLabel 只作为“当前目标技能卡片入口”显示，完整技能说明通过 ToolTip 展示。
+    ui->bossSkillLabel->setText("当前目标技能");
     ui->bossSkillLabel->setCursor(Qt::PointingHandCursor);
     ui->bossSkillLabel->setToolTip(buildBossSpecialSkillText(enemy));
+
+    updateEnemySlotStyles();
+}
+
+
+void MainWindow::clearEnemySlots()
+{
+    for (EnemySlotWidgets& slot : enemySlots) {
+        if (slot.root) {
+            slot.root->hide();
+            slot.root->deleteLater();
+        }
+    }
+    enemySlots.clear();
+}
+
+void MainWindow::positionEnemySlots()
+{
+    if (!ui || !ui->centralwidget || enemySlots.isEmpty()) {
+        return;
+    }
+
+    QRect base;
+    if (ui->enemyImageLabel) {
+        base = geometryInCentral(ui->enemyImageLabel);
+    }
+    if (!base.isValid() || base.width() <= 0 || base.height() <= 0) {
+        base = QRect(ui->centralwidget->width() * 58 / 100,
+                     ui->centralwidget->height() * 16 / 100,
+                     ui->centralwidget->width() * 30 / 100,
+                     ui->centralwidget->height() * 36 / 100);
+    }
+
+    const int n = enemySlots.size();
+
+    // 多怪版本不要做成大卡牌：整体宽度收窄，单个怪更接近“立绘 + 光晕”。
+    const int gap = 24;
+    const int maxTotalWidth = qBound(280, ui->centralwidget->width() * 34 / 100, 560);
+    int slotW = (maxTotalWidth - gap * (n - 1)) / qMax(1, n);
+    slotW = qBound(105, slotW, 172);
+
+    int slotH = qBound(155, base.height() * 72 / 100, 232);
+    if (n >= 3) {
+        slotH = qMin(slotH, 205);
+    }
+
+    const int totalW = slotW * n + gap * (n - 1);
+    int x0 = base.center().x() - totalW / 2;
+    x0 = qBound(8, x0, qMax(8, ui->centralwidget->width() - totalW - 8));
+
+    int y = base.y() + qMax(0, base.height() / 14);
+    y = qBound(8, y, qMax(8, ui->centralwidget->height() - slotH - 128));
+
+    for (int i = 0; i < enemySlots.size(); ++i) {
+        if (enemySlots[i].root) {
+            enemySlots[i].root->setGeometry(x0 + i * (slotW + gap), y, slotW, slotH);
+        }
+    }
+}
+
+void MainWindow::updateEnemySlotStyles()
+{
+    for (EnemySlotWidgets& slot : enemySlots) {
+        if (!slot.root) {
+            continue;
+        }
+
+        const bool selected = (slot.enemyIndex == selectedEnemyIndex);
+        const bool executing = (slot.enemyIndex == executingEnemyIndex);
+
+        QColor glowColor(92, 210, 255, 95);
+        int glowBlur = 22;
+        QString textColor = "#D7F7FF";
+        QString tagColor = "#9BEFFF";
+
+        if (selected) {
+            glowColor = QColor(105, 235, 255, 210);
+            glowBlur = 34;
+            textColor = "#F4FEFF";
+            tagColor = "#69EBFF";
+        }
+        if (executing) {
+            glowColor = QColor(255, 209, 102, 230);
+            glowBlur = 40;
+            textColor = "#FFF6D7";
+            tagColor = "#FFD166";
+        }
+
+        // root 保持透明，不再像卡牌。点击范围仍然存在。
+        slot.root->setStyleSheet(QString(
+            "QPushButton#enemySlot {"
+            "background-color: transparent;"
+            "border: none;"
+            "border-radius: 0px;"
+            "padding: 0px;"
+            "}"
+            "QPushButton#enemySlot:hover {"
+            "background-color: rgba(105,235,255,24);"
+            "border: none;"
+            "}"
+            "QLabel {"
+            "background: transparent;"
+            "border: none;"
+            "color: %1;"
+            "}"
+        ).arg(textColor));
+
+        if (slot.image) {
+            auto* effect = qobject_cast<QGraphicsDropShadowEffect*>(slot.image->graphicsEffect());
+            if (!effect) {
+                effect = new QGraphicsDropShadowEffect(slot.image);
+                slot.image->setGraphicsEffect(effect);
+            }
+            effect->setBlurRadius(glowBlur);
+            effect->setOffset(0, 0);
+            effect->setColor(glowColor);
+        }
+
+        if (slot.info) {
+            slot.info->setStyleSheet(QString(
+                "QLabel {"
+                "color: %1;"
+                "font-size: 11px;"
+                "font-weight: 900;"
+                "background: rgba(2, 8, 15, 96);"
+                "border: 1px solid rgba(105,235,255,80);"
+                "border-radius: 7px;"
+                "padding: 2px 5px;"
+                "}"
+            ).arg(textColor));
+        }
+
+        if (slot.intent) {
+            slot.intent->setStyleSheet(QString(
+                "QLabel {"
+                "color: %1;"
+                "font-size: 10px;"
+                "font-weight: 800;"
+                "background: transparent;"
+                "border: none;"
+                "}"
+            ).arg(tagColor));
+        }
+    }
+}
+
+void MainWindow::refreshEnemySlots()
+{
+    if (!ui || !ui->centralwidget) {
+        return;
+    }
+
+    if (!gameManager) {
+        clearEnemySlots();
+        return;
+    }
+
+    ensureSelectedEnemyValid();
+
+    if (ui->enemyImageLabel) {
+        ui->enemyImageLabel->hide();
+    }
+
+    clearEnemySlots();
+
+    const QVector<int> alive = aliveEnemyIndexes();
+    if (alive.isEmpty()) {
+        return;
+    }
+
+    for (int enemyIndex : alive) {
+        Enemy* enemy = enemyByIndex(enemyIndex);
+        if (!enemy) {
+            continue;
+        }
+
+        auto* root = new QPushButton(ui->centralwidget);
+        root->setObjectName("enemySlot");
+        root->setCursor(Qt::PointingHandCursor);
+        root->setFocusPolicy(Qt::NoFocus);
+        root->setAttribute(Qt::WA_StyledBackground, true);
+
+        auto* layout = new QVBoxLayout(root);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(2);
+
+        auto* image = new QLabel(root);
+        image->setAlignment(Qt::AlignCenter);
+        image->setMinimumHeight(104);
+        image->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        image->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        image->setStyleSheet("QLabel { background: transparent; border: none; }");
+
+        auto* info = new QLabel(root);
+        info->setAlignment(Qt::AlignCenter);
+        info->setWordWrap(false);
+        info->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        info->setStyleSheet("QLabel { color: #F6FEFF; font-size: 11px; font-weight: 900; background: rgba(2,8,15,96); border-radius: 7px; padding: 2px 5px; }");
+
+        auto* intent = new QLabel(root);
+        intent->setAlignment(Qt::AlignCenter);
+        intent->setWordWrap(false);
+        intent->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        intent->setStyleSheet("QLabel { color: #A9EFFF; font-size: 10px; font-weight: 800; background: transparent; border: none; }");
+
+        layout->addWidget(image, 1);
+        layout->addWidget(info);
+        layout->addWidget(intent);
+
+        EnemySlotWidgets slot;
+        slot.root = root;
+        slot.image = image;
+        slot.info = info;
+        slot.intent = intent;
+        slot.enemyIndex = enemyIndex;
+        enemySlots.push_back(slot);
+
+        connect(root, &QPushButton::clicked, this, [this, enemyIndex]() {
+            setSelectedEnemyIndex(enemyIndex);
+        });
+
+        info->setText(QString::fromStdString(enemy->name));
+
+        QString intentText = QString::fromStdString(enemy->nextIntent.name());
+        if (enemy->nextIntent.value > 0) {
+            intentText += QString(" %1").arg(enemy->nextIntent.value);
+        }
+        if (enemyIndex == selectedEnemyIndex) {
+            intentText = "TARGET / " + intentText;
+        }
+        if (enemyIndex == executingEnemyIndex) {
+            intentText = "RUNNING / " + intentText;
+        }
+        intent->setText(intentText);
+
+        QStringList descLines;
+        for (const std::string& line : enemy->getDescription()) {
+            descLines << QString::fromStdString(line).toHtmlEscaped();
+        }
+
+        const QString status = buildStatusSummary(enemy->statuses);
+        QString statusHtml;
+        if (!status.isEmpty()) {
+            statusHtml = QString("<div style='margin-top:4px;color:#BFF7FF;'>状态：%1</div>")
+                             .arg(status.toHtmlEscaped());
+        }
+
+        // 注意：ToolTip 不能先拼普通文本再拼 <html>，否则 Qt 会把后面的 HTML 当成普通文本显示。
+        // 这里统一生成一整段 HTML。
+        QString slotTip = QString(
+            "<html><body style='background-color:#07111C;color:#F7FDFF;"
+            "font-family:Microsoft YaHei UI,Segoe UI;font-size:10.5pt;line-height:150%;'>"
+            "<div style='color:#8BFCFF;font-size:13pt;font-weight:800;'>%1</div>"
+            "<div>HP：%2/%3</div>"
+            "<div>护盾：%4</div>"
+            "<div>意图：%5%6</div>"
+            "%7"
+            "<hr style='border:0;border-top:1px solid #6B3AA0;margin:6px 0;'>"
+            "<div style='color:#8BE9FF;font-weight:700;margin-bottom:4px;'>技能说明</div>"
+            "<div style='margin:3px 0;color:#F2FDFF;'>%8</div>"
+            "</body></html>"
+        )
+            .arg(QString::fromStdString(enemy->name).toHtmlEscaped())
+            .arg(enemy->hp)
+            .arg(enemy->maxHp)
+            .arg(enemy->shield)
+            .arg(QString::fromStdString(enemy->nextIntent.name()).toHtmlEscaped())
+            .arg(enemy->nextIntent.value > 0 ? QString(" %1").arg(enemy->nextIntent.value) : QString())
+            .arg(statusHtml)
+            .arg(descLines.isEmpty() ? QStringLiteral("无特殊技能") : descLines.join("<br>"));
+
+        root->setToolTip(slotTip);
+        root->show();
+        root->raise();
+    }
+
+    positionEnemySlots();
+
+    for (EnemySlotWidgets& slot : enemySlots) {
+        Enemy* enemy = enemyByIndex(slot.enemyIndex);
+        if (enemy && slot.image) {
+            setScaledPixmap(slot.image, enemyImagePath(enemy));
+        }
+    }
+
+    updateEnemySlotStyles();
 }
 
 void MainWindow::refreshPileUi()
@@ -2468,19 +2804,13 @@ void MainWindow::refreshImageUi()
 
     ui->playerImageLabel->show();
 
-    Enemy* enemy = firstAliveEnemy();
-    if (!enemy) {
+    // 多敌人版本不再使用单个 enemyImageLabel 显示所有敌人。
+    // 它只作为 Designer 中的定位锚点保留，真正敌人立绘由 refreshEnemySlots() 动态创建。
+    if (ui->enemyImageLabel) {
         ui->enemyImageLabel->hide();
-        return;
     }
 
-    ui->enemyImageLabel->show();
-
-    const QString path = enemyImagePath(enemy);
-    if (ui->enemyImageLabel->property("portraitPath").toString() != path) {
-        setScaledPixmap(ui->enemyImageLabel, path);
-        ui->enemyImageLabel->setProperty("portraitPath", path);
-    }
+    refreshEnemySlots();
 }
 
 void MainWindow::refreshMainCodeEditor()
@@ -2528,8 +2858,9 @@ void MainWindow::refreshSideCodeEditors()
         return;
     }
 
+    ensureSelectedEnemyValid();
     updateSideCode(Side::Player, makeTickStatusesBlock(gameManager->getPlayerCodeLines()));
-    updateSideCode(Side::Enemy, makeTickStatusesBlock(gameManager->getEnemyCodeLines(firstAliveEnemy())));
+    updateSideCode(Side::Enemy, makeTickStatusesBlock(gameManager->getEnemyCodeLines(inspectedEnemy())));
 
     if (!sideChangeHighlightActive) {
         startNextSideChangeHighlight();
@@ -2590,14 +2921,34 @@ void MainWindow::highlightCodeBlock(int commandIndex)
     }
 
     activeCodeIndex = commandIndex;
+
+    const QVector<CodeCommandView> commands = gameManager ? gameManager->getCodeCommandViews() : QVector<CodeCommandView>();
+    if (commandIndex >= 0 && commandIndex < commands.size()) {
+        const int idx = enemyIndexFromCommand(commands[commandIndex]);
+        executingEnemyIndex = idx;
+        if (idx >= 0) {
+            inspectedEnemyIndex = idx;
+        }
+    } else {
+        executingEnemyIndex = -1;
+    }
+
     applyMainCodeStyle();
+    refreshEnemySlots();
+    refreshSideCodeEditors();
     syncSideExecutionHighlightWithActiveCode();
 }
 
 void MainWindow::clearCodeHighlight()
 {
     activeCodeIndex = -1;
+    executingEnemyIndex = -1;
+    if (selectedEnemy()) {
+        inspectedEnemyIndex = selectedEnemyIndex;
+    }
     applyMainCodeStyle();
+    refreshEnemySlots();
+    refreshSideCodeEditors();
     syncSideExecutionHighlightWithActiveCode();
 }
 
@@ -2930,12 +3281,164 @@ Enemy* MainWindow::firstAliveEnemy() const
         return nullptr;
     }
 
-    for (const auto& enemyPtr : gameManager->battle.enemies) {
-        if (enemyPtr && enemyPtr->isAlive()) {
-            return enemyPtr.get();
+    for (auto& enemy : gameManager->battle.enemies) {
+        if (enemy && enemy->isAlive()) {
+            return enemy.get();
         }
     }
     return nullptr;
+}
+
+Enemy* MainWindow::enemyByIndex(int index) const
+{
+    if (!gameManager) {
+        return nullptr;
+    }
+    if (index < 0 || index >= static_cast<int>(gameManager->battle.enemies.size())) {
+        return nullptr;
+    }
+
+    const auto& enemy = gameManager->battle.enemies[index];
+    if (!enemy || !enemy->isAlive()) {
+        return nullptr;
+    }
+    return enemy.get();
+}
+
+QVector<int> MainWindow::aliveEnemyIndexes() const
+{
+    QVector<int> result;
+    if (!gameManager) {
+        return result;
+    }
+
+    for (int i = 0; i < static_cast<int>(gameManager->battle.enemies.size()); ++i) {
+        const auto& enemy = gameManager->battle.enemies[i];
+        if (enemy && enemy->isAlive()) {
+            result.push_back(i);
+        }
+    }
+    return result;
+}
+
+int MainWindow::enemyIndexOf(Enemy* enemy) const
+{
+    if (!gameManager || !enemy) {
+        return -1;
+    }
+
+    for (int i = 0; i < static_cast<int>(gameManager->battle.enemies.size()); ++i) {
+        if (gameManager->battle.enemies[i].get() == enemy) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+Enemy* MainWindow::selectedEnemy() const
+{
+    Enemy* enemy = enemyByIndex(selectedEnemyIndex);
+    if (enemy) {
+        return enemy;
+    }
+    return firstAliveEnemy();
+}
+
+Enemy* MainWindow::inspectedEnemy() const
+{
+    Enemy* enemy = enemyByIndex(inspectedEnemyIndex);
+    if (enemy) {
+        return enemy;
+    }
+    return selectedEnemy();
+}
+
+int MainWindow::enemyIndexFromCommand(const CodeCommandView& command) const
+{
+    if (!gameManager) {
+        return -1;
+    }
+
+    QString text = command.title + "\n" + command.lines.join("\n");
+    text = text.toLower();
+
+    // 如果当前选中目标名称出现在命令中，优先认为命令作用于当前目标。
+    Enemy* selected = enemyByIndex(selectedEnemyIndex);
+    if (selected) {
+        const QString selectedName = QString::fromStdString(selected->name).toLower();
+        if (!selectedName.isEmpty() && text.contains(selectedName)) {
+            return selectedEnemyIndex;
+        }
+    }
+
+    for (int i = 0; i < static_cast<int>(gameManager->battle.enemies.size()); ++i) {
+        const auto& enemy = gameManager->battle.enemies[i];
+        if (!enemy || !enemy->isAlive()) {
+            continue;
+        }
+
+        const QString name = QString::fromStdString(enemy->name).toLower();
+        if (!name.isEmpty() && text.contains(name)) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void MainWindow::ensureSelectedEnemyValid()
+{
+    const QVector<int> alive = aliveEnemyIndexes();
+    if (alive.isEmpty()) {
+        selectedEnemyIndex = -1;
+        inspectedEnemyIndex = -1;
+        executingEnemyIndex = -1;
+        return;
+    }
+
+    if (!enemyByIndex(selectedEnemyIndex)) {
+        selectedEnemyIndex = alive.first();
+    }
+
+    if (!enemyByIndex(inspectedEnemyIndex)) {
+        inspectedEnemyIndex = selectedEnemyIndex;
+    }
+
+    if (executingEnemyIndex >= 0 && !enemyByIndex(executingEnemyIndex)) {
+        executingEnemyIndex = -1;
+    }
+}
+
+void MainWindow::setSelectedEnemyIndex(int index)
+{
+    if (!enemyByIndex(index)) {
+        return;
+    }
+
+    selectedEnemyIndex = index;
+    inspectedEnemyIndex = index;
+    executingEnemyIndex = -1;
+
+    appendLog(QString("当前目标切换为【%1】。")
+                  .arg(QString::fromStdString(enemyByIndex(index)->name)));
+
+    refreshEnemyUi();
+    refreshEnemySlots();
+    refreshSideCodeEditors();
+}
+
+QWidget* MainWindow::enemyAnchorWidget(int enemyIndex) const
+{
+    for (const EnemySlotWidgets& slot : enemySlots) {
+        if (slot.enemyIndex == enemyIndex && slot.root) {
+            return slot.root;
+        }
+    }
+
+    if (ui && ui->enemyImageLabel) {
+        return ui->enemyImageLabel;
+    }
+    return ui ? ui->centralwidget : nullptr;
 }
 
 QString MainWindow::formatCardText(const CardView& card) const

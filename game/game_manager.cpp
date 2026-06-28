@@ -3,6 +3,8 @@
 #include <ctime>     // time
 #include <algorithm> // shuffle, remove_if
 #include <random>    // mt19937 for map generation
+#include <map>
+#include <QRegularExpression>
 
 // ============================================================
 // 静态变量定义
@@ -31,6 +33,80 @@ static CardView makeCardViewFromCard(const Card* card)
         view.codeLines << QString::fromStdString(line);
     }
     return view;
+}
+
+
+// ============================================================
+// 多敌人目标辅助
+// ============================================================
+
+static QString enemyCodeExpr(Enemy* enemy)
+{
+    if (!enemy) {
+        return QStringLiteral("enemy");
+    }
+
+    QString name = QString::fromStdString(enemy->name);
+    name.replace("\\", "\\\\");
+    name.replace("\"", "\\\"");
+    return QString("enemy[\"%1\"]").arg(name);
+}
+
+static Enemy* findAliveEnemyByName(BattleContext& battle, const std::string& name)
+{
+    for (auto& enemy : battle.enemies) {
+        if (enemy && enemy->isAlive() && enemy->name == name) {
+            return enemy.get();
+        }
+    }
+    return nullptr;
+}
+
+static QStringList makeTargetedCodeLines(const Card* card, Enemy* target)
+{
+    QStringList lines;
+    if (!card) {
+        return lines;
+    }
+
+    const QString targetExpr = enemyCodeExpr(target);
+    for (const std::string& raw : card->getCodeLines()) {
+        QString line = QString::fromStdString(raw);
+
+        // 只替换独立单词 enemy，不会影响 enemies / adjacentEnemies。
+        if (target) {
+            line.replace(QRegularExpression(QStringLiteral("\\benemy\\b")), targetExpr);
+        }
+
+        lines << line;
+    }
+
+    return lines;
+}
+
+static void disambiguateEnemyDisplayNames(BattleContext& battle)
+{
+    std::map<std::string, int> totalCount;
+    for (const auto& enemy : battle.enemies) {
+        if (enemy) {
+            totalCount[enemy->name]++;
+        }
+    }
+
+    std::map<std::string, int> usedCount;
+    for (auto& enemy : battle.enemies) {
+        if (!enemy) {
+            continue;
+        }
+
+        const std::string baseName = enemy->name;
+        if (totalCount[baseName] <= 1) {
+            continue;
+        }
+
+        int index = ++usedCount[baseName];
+        enemy->name = baseName + "#" + std::to_string(index);
+    }
 }
 
 GameManager::GameManager(int nodeId)
@@ -136,6 +212,11 @@ void GameManager::initLevel() {
                 battle.addEnemy(std::move(enemy));
             }
         }
+
+        // 同一种怪物如果出现多个，必须在 GameManager 层给出稳定、唯一的显示名。
+        // 例如：程序猿#1 / 程序猿#2。
+        // UI 和代码行都依赖这个名字来区分目标。
+        disambiguateEnemyDisplayNames(battle);
         return;
     }
 
@@ -177,6 +258,8 @@ void GameManager::initLevel() {
             battle.addEnemy(createEnemyByName("Goblin"));
             break;
     }
+
+    disambiguateEnemyDisplayNames(battle);
 }
 
 // ============================================================
@@ -678,19 +761,25 @@ PlayResult GameManager::playCardAsCode(int handIndex, Enemy* target) {
 
     CardView view = makeCardViewFromCard(card);
 
-    // 不立即执行，而是挂入代码队列
+    // 不立即执行，而是挂入代码队列。
+    // 这里不再捕获 Enemy*，因为敌人死亡后 BattleContext 可能移除 unique_ptr，
+    // 原指针会悬空。我们记录选中敌人的唯一显示名，真正执行时再按名字解析。
     Card* rawCard = card;
-    Enemy* rawTarget = target;
+    const std::string targetName = target ? target->name : std::string();
 
-    // 从卡牌自身获取代码行
-    QStringList lines;
-    for (auto& s : card->getCodeLines())
-        lines << QString::fromStdString(s);
+    QStringList lines = makeTargetedCodeLines(card, target);
+    view.codeLines = lines;
 
     PendingCodeCommand cmd;
     cmd.title = view.name;
     cmd.lines = lines;
-    cmd.effect = [this, rawCard, rawTarget]() { rawCard->play(player, rawTarget); };
+    cmd.effect = [this, rawCard, targetName]() {
+        Enemy* resolvedTarget = targetName.empty()
+            ? nullptr
+            : findAliveEnemyByName(battle, targetName);
+
+        rawCard->play(player, resolvedTarget);
+    };
 
     insertPlayerCommandBeforeEnemy(std::move(cmd));
 
