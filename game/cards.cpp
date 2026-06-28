@@ -6,11 +6,11 @@
 #include <cstdlib>
 #include <algorithm>
 
-// ============================================================
-// Card 基类实现
-// ============================================================
+    // ============================================================
+    // Card 基类实现
+    // ============================================================
 
-bool Card::canPlay(const Player& player) const {
+    bool Card::canPlay(const Player& player) const {
     return player.energy >= cost && !player.isDisabled();
 }
 
@@ -24,14 +24,14 @@ std::vector<std::string> Card::getCodeLines() const {
 
 std::string FunctionCard::getFunctionName(FunctionTarget ft) {
     switch (ft) {
-        case FunctionTarget::ATTACK:       return "attack()";
-        case FunctionTarget::TAKE_DAMAGE:  return "takeDamage()";
-        case FunctionTarget::SUMMON:       return "summon()";
-        case FunctionTarget::COPY_SUMMON:  return "copySummon()";
-        case FunctionTarget::MOVE_SUMMON:  return "moveSummon()";
-        case FunctionTarget::SACRIFICE:    return "sacrifice()";
-        case FunctionTarget::ESCAPE:       return "escape()";
-        default:                           return "unknown()";
+    case FunctionTarget::ATTACK:       return "attack()";
+    case FunctionTarget::TAKE_DAMAGE:  return "takeDamage()";
+    case FunctionTarget::SUMMON:       return "summon()";
+    case FunctionTarget::COPY_SUMMON:  return "copySummon()";
+    case FunctionTarget::MOVE_SUMMON:  return "moveSummon()";
+    case FunctionTarget::SACRIFICE:    return "sacrifice()";
+    case FunctionTarget::ESCAPE:       return "escape()";
+    default:                           return "unknown()";
     }
 }
 
@@ -141,7 +141,7 @@ std::vector<std::string> ComboAttackCard::getCodeLines() const {
 void CritAttackCard::play(Player& player, Enemy* target) {
     auto oldAttack = player.getAttackFunc();
     player.setAttackFunc([oldAttack, &player](Enemy& enemy, std::function<int(int)> mod) {
-        bool isCrit = (rand() % 100) < 30;
+        bool isCrit = (rand() % 100) < 50;
         if (isCrit) {
             auto critMod = [mod](int atk) -> int {
                 int base = mod ? mod(atk) : atk;
@@ -158,7 +158,7 @@ std::vector<std::string> CritAttackCard::getCodeLines() const {
     return {
         "auto oldAttack = player.getAttackFunc();",
         "player.setAttackFunc([oldAttack, &player](Enemy& enemy, mod) {",
-        "    bool isCrit = (rand() \% 100) < 30;",
+        "    bool isCrit = (rand() \% 100) < 50;",
         "    if (isCrit) {",
         "        auto critMod = [mod](int atk) { return 2 * (mod ? mod(atk) : atk); };",
         "        oldAttack(enemy, critMod);",
@@ -175,7 +175,7 @@ void PoisonAttackCard::play(Player& player, Enemy* target) {
         poison.type = StatusType::POISON;
         poison.value = 3;
         poison.turnsRemaining = 5;
-        enemy.addStatus(poison);
+        for (int i = 0; i < 6; ++i) enemy.addStatus(poison);
     });
 }
 
@@ -185,7 +185,7 @@ std::vector<std::string> PoisonAttackCard::getCodeLines() const {
         "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
         "    oldAttack(enemy, mod);",
         "    Status poison(POISON, 3, 5);",
-        "    enemy.addStatus(poison);",
+        "    for (int i = 0; i < 6; ++i) enemy.addStatus(poison);",
         "});"
     };
 }
@@ -198,7 +198,7 @@ void BurnAttackCard::play(Player& player, Enemy* target) {
         burn.type = StatusType::BURN;
         burn.value = 5;
         burn.turnsRemaining = 3;
-        enemy.addStatus(burn);
+        for (int i = 1; i <= 4; ++i) enemy.addStatus(burn);
     });
 }
 
@@ -208,7 +208,7 @@ std::vector<std::string> BurnAttackCard::getCodeLines() const {
         "player.setAttackFunc([oldAttack](Enemy& enemy, mod) {",
         "    oldAttack(enemy, mod);",
         "    Status burn(BURN, 5, 3);",
-        "    enemy.addStatus(burn);",
+        "    for (int i = 1; i <= 4; ++i) enemy.addStatus(burn);",
         "});"
     };
 }
@@ -337,15 +337,6 @@ std::vector<std::string> IronWallCard::getCodeLines() const {
     };
 }
 
-void CounterDamageCard::play(Player& player, Enemy* target) {
-    auto oldTakeDamage = player.getTakeDamageFunc();
-    player.setTakeDamageFunc([oldTakeDamage](int dmg, DamageType type) {
-        oldTakeDamage(dmg, type);
-        // 注意：需要战斗上下文支持记录攻击者
-        // 完整实现需要 Battle 类传递攻击者引用
-    });
-}
-
 void RegenerationCard::play(Player& player, Enemy* target) {
     auto oldTakeDamage = player.getTakeDamageFunc();
     player.setTakeDamageFunc([oldTakeDamage, &player](int dmg, DamageType type) {
@@ -371,14 +362,6 @@ void DodgeCard::play(Player& player, Enemy* target) {
         if (!dodged) {
             oldTakeDamage(dmg, type);
         }
-    });
-}
-
-void ThornsCard::play(Player& player, Enemy* target) {
-    auto oldTakeDamage = player.getTakeDamageFunc();
-    player.setTakeDamageFunc([oldTakeDamage](int dmg, DamageType type) {
-        oldTakeDamage(dmg, type);
-        // 注意：需要战斗上下文记录攻击者
     });
 }
 
@@ -435,8 +418,8 @@ void MassProductionCard::play(Player& player, Enemy* target) {
 void PreciseCopyCard::play(Player& player, Enemy* target) {
     player.setCopySummonFunc([](const Minion& original) -> Minion {
         return Minion(original.name + "精准复制",
-                     static_cast<int>(original.maxHp * 0.9),
-                     static_cast<int>(original.attack * 0.9));
+                      static_cast<int>(original.maxHp * 0.9),
+                      static_cast<int>(original.attack * 0.9));
     });
 }
 
@@ -534,16 +517,14 @@ void RearguardEscapeCard::play(Player& player, Enemy* target) {
 // 指令牌实现
 // ============================================================
 
+void StrikeCard::play(Player& player, Enemy* target) {
+    if (!target) return;
+    player.attack(*target);
+}
+
 void PowerStrikeCard::play(Player& player, Enemy* target) {
     if (!target) return;
     player.attack(*target, [](int atk) { return atk * 2; });
-}
-
-void SweepCard::play(Player& player, Enemy* target) {
-    // 注意：需要战斗上下文来获取全体敌人
-    // 这里简化为单体
-    if (!target) return;
-    player.attack(*target, [](int atk) { return atk / 2; });
 }
 
 void DefendCard::play(Player& player, Enemy* target) {
@@ -551,9 +532,10 @@ void DefendCard::play(Player& player, Enemy* target) {
 }
 
 void StrengthCard::play(Player& player, Enemy* target) {
+    int strengthValue = static_cast<int>(player.getEffectiveAttack() * 0.5);
     Status strengthBuff;
     strengthBuff.type = StatusType::STRENGTH;
-    strengthBuff.value = 2;
+    strengthBuff.value = strengthValue;
     strengthBuff.turnsRemaining = 3;
     player.addStatus(strengthBuff);
 }
@@ -566,17 +548,11 @@ void SummonCard::play(Player& player, Enemy* target) {
 }
 
 void HealCard::play(Player& player, Enemy* target) {
-    player.heal(15);
+    player.heal(20);
 }
 
 void PurifyCard::play(Player& player, Enemy* target) {
     player.statuses.clear();
-}
-
-void SacrificeCard::play(Player& player, Enemy* target) {
-    if (!player.minions.empty()) {
-        player.sacrifice(player.minions.front());
-    }
 }
 
 void BloodSacrificeCard::play(Player& player, Enemy* target) {
@@ -641,13 +617,6 @@ void DoubleEffectCard::applyWrapper(Player& player, Enemy* target) {
 // 补充所有缺失的 getCodeLines 实现
 // ============================================================
 
-std::vector<std::string> CounterDamageCard::getCodeLines() const {
-    return {
-        "oldTakeDamage(dmg, type);",
-        "// Counter: attack source for 0.5 * dmg"
-    };
-}
-
 std::vector<std::string> DodgeCard::getCodeLines() const {
     return {
         "auto oldTakeDamage = player.getTakeDamageFunc();",
@@ -656,10 +625,6 @@ std::vector<std::string> DodgeCard::getCodeLines() const {
         "    if (!dodged) oldTakeDamage(dmg, type);",
         "});"
     };
-}
-
-std::vector<std::string> ThornsCard::getCodeLines() const {
-    return {"player.attack(enemy, 0.3 * dmg);"};
 }
 
 std::vector<std::string> RageCard::getCodeLines() const {
@@ -814,12 +779,12 @@ std::vector<std::string> RearguardEscapeCard::getCodeLines() const {
     };
 }
 
-std::vector<std::string> PowerStrikeCard::getCodeLines() const {
-    return {"player.attack(enemy, 2 * player.baseAttack);"};
+std::vector<std::string> StrikeCard::getCodeLines() const {
+    return {"player.attack(enemy);"};
 }
 
-std::vector<std::string> SweepCard::getCodeLines() const {
-    return {"for (auto& e : enemies) e.takeDamage(dmg);"};
+std::vector<std::string> PowerStrikeCard::getCodeLines() const {
+    return {"player.attack(enemy, 2 * player.baseAttack);"};
 }
 
 std::vector<std::string> DefendCard::getCodeLines() const {
@@ -846,7 +811,7 @@ std::vector<std::string> EmergencyDodgeCard::getCodeLines() const {
 }
 
 std::vector<std::string> HealCard::getCodeLines() const {
-    return {"player.heal(15);"};
+    return {"player.heal(20);"};
 }
 
 std::vector<std::string> SummonCard::getCodeLines() const {
@@ -860,17 +825,6 @@ std::vector<std::string> QuickCopyCard::getCodeLines() const {
     };
 }
 
-std::vector<std::string> MassSummonCard::getCodeLines() const {
-    return {"// Mass summon limited by max minions (2)"};
-}
-
-std::vector<std::string> SacrificeCard::getCodeLines() const {
-    return {
-        "if (!player.minions.empty())",
-        "    player.sacrifice(player.minions[0]);"
-    };
-}
-
 std::vector<std::string> BloodSacrificeCard::getCodeLines() const {
     return {
         "if (!player.minions.empty()) {",
@@ -880,24 +834,8 @@ std::vector<std::string> BloodSacrificeCard::getCodeLines() const {
     };
 }
 
-std::vector<std::string> ChainExplosionCard::getCodeLines() const {
-    return {
-        "int totalDmg = 0;",
-        "for (auto& m : player.minions) totalDmg += m.hp;",
-        "player.attack(enemy, totalDmg);",
-        "player.minions.clear();"
-    };
-}
-
 std::vector<std::string> StrengthCard::getCodeLines() const {
     return {"player.addStatus(STRENGTH(3, 2));"};
-}
-
-std::vector<std::string> BerserkerCard::getCodeLines() const {
-    return {
-        "int hpLost = player.maxHp - player.hp;",
-        "player.addStatus(STRENGTH(3, hpLost / 20));"
-    };
 }
 
 std::vector<std::string> PurifyCard::getCodeLines() const {
@@ -923,10 +861,6 @@ std::vector<std::string> TripleEffectCard::getCodeLines() const {
     return {"// Execute wrapped card 3 times"};
 }
 
-std::vector<std::string> ConstTemplateCard::getCodeLines() const {
-    return {"// Const template: reduce cost"};
-}
-
 // ============================================================
 // 实现 cards_full.h 中所有缺失的卡牌
 // ============================================================
@@ -948,16 +882,6 @@ std::vector<std::string> AttackCritCard::getCodeLines() const {
         "if (rand() < 0.3) player.attack(enemy, 2 * dmg);",
         "else player.attack(enemy, dmg);"
     };
-}
-
-// 攻击函数·溅射
-void AttackSplashCard::play(Player& player, Enemy* target) {
-    auto oldAttack = player.getAttackFunc();
-    player.setAttackFunc([&player](Enemy& enemy, std::function<int(int)> mod) {
-        int dmg = mod ? mod(player.getEffectiveAttack()) : player.getEffectiveAttack();
-        enemy.takeDamage(dmg, DamageType::PHYSICAL);
-        // TODO: 对相邻敌人造成 50\% 伤害（目前单敌人版本暂不实现）
-    });
 }
 
 std::vector<std::string> AttackSplashCard::getCodeLines() const {
@@ -1369,25 +1293,6 @@ std::vector<std::string> DefendIronWallCard::getCodeLines() const {
     };
 }
 
-// 防御函数·反射
-void DefendReflectCard::play(Player& player, Enemy* target) {
-    auto oldTakeDamage = player.getTakeDamageFunc();
-    player.setTakeDamageFunc([oldTakeDamage, target](int damage, DamageType type) {
-        oldTakeDamage(damage, type);
-        int reflect = damage / 3;
-        if (target) {
-            target->takeDamage(reflect, DamageType::PHYSICAL);
-        }
-    });
-}
-
-std::vector<std::string> DefendReflectCard::getCodeLines() const {
-    return {
-        "oldTakeDamage(damage, type);",
-        "if (target) target->takeDamage(damage / 3, PHYSICAL);"
-    };
-}
-
 // 防御函数·再生
 void DefendRegenerationCard::play(Player& player, Enemy* target) {
     auto oldTakeDamage = player.getTakeDamageFunc();
@@ -1510,24 +1415,6 @@ std::vector<std::string> DefendFortifyCard::getCodeLines() const {
     return {
         "int capped = min(damage, 15);",
         "oldTakeDamage(capped, type);"
-    };
-}
-
-// 防御函数·荆棘
-void DefendThornsCard::play(Player& player, Enemy* target) {
-    auto oldTakeDamage = player.getTakeDamageFunc();
-    player.setTakeDamageFunc([oldTakeDamage, target](int damage, DamageType type) {
-        oldTakeDamage(damage, type);
-        if (target) {
-            target->takeDamage(damage / 4, DamageType::PHYSICAL);
-        }
-    });
-}
-
-std::vector<std::string> DefendThornsCard::getCodeLines() const {
-    return {
-        "oldTakeDamage(damage, type);",
-        "if (target) target->takeDamage(damage / 4, PHYSICAL);"
     };
 }
 

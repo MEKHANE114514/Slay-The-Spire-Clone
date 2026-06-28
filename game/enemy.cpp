@@ -152,31 +152,132 @@ void Goblin::takeTurn(Player& player) {
     }
 }
 
-std::vector<std::string> Goblin::getDescription() const { return {"普通的程序猿，每回合造成 6 点物理伤害。"}; }
+std::vector<std::string> Goblin::getDescription() const { return {"普通的程序猿，每回合造成 7 点物理伤害。"}; }
 
 void FireGoblin::takeTurn(Player& player) {
-    // 设置意图：显示即将攻击
-    setIntent(EnemyIntent::ATTACK, getEffectiveAttack());
+    turnCounter++;
 
-    // 执行攻击
+    // 先处理累积的反伤
+    if (reflectDamageStacks > 0) {
+        int totalReflectDamage = reflectDamageStacks * 3;
+        player.takeDamage(totalReflectDamage, DamageType::FIRE);
+        reflectDamageStacks = 0;
+    }
+
+    // 奇数回合：火焰屏障
+    if (turnCounter % 2 == 1) {
+        setIntent(EnemyIntent::DEFEND, 10);
+
+        if (!isDisabled()) {
+            // 获得 10 点护盾
+            shield += 10;
+            if (onShieldChanged) onShieldChanged(shield, 10);
+        }
+    }
+    // 偶数回合：燃烧
+    else {
+        setIntent(EnemyIntent::BUFF, 3);
+
+        if (!isDisabled()) {
+            // 给玩家施加 3 回合灼烧
+            Status burn;
+            burn.type = StatusType::BURN;
+            burn.value = 3;
+            burn.turnsRemaining = 3;
+            player.addStatus(burn);
+        }
+    }
+
+    // 每回合都进行攻击
     if (!isDisabled()) {
         player.takeDamage(getEffectiveAttack(), DamageType::FIRE);
     }
 }
 
-std::vector<std::string> FireGoblin::getDescription() const { return {"内心火热的程序猿，每回合造成 6 点火属性伤害。"}; }
+void FireGoblin::takeDamage(int dmg, DamageType dtype) {
+    // 如果有护盾且受到攻击，记录反伤
+    if (shield > 0 && dmg > 0) {
+        reflectDamageStacks++;
+    }
+
+    // 调用基类的受伤逻辑
+    Enemy::takeDamage(dmg, dtype);
+}
+
+std::vector<std::string> FireGoblin::getDescription() const {
+    return {
+        "内心火热的程序猿，每回合造成 12 点火属性伤害。",
+        "【火焰屏障】奇数回合获得 10 点护盾，攻击有护盾的炽热程序猿会在其下回合受到 3 点火焰反伤",
+        "【燃烧】偶数回合使玩家获得 3 回合灼烧状态（每回合 3 点伤害）"
+    };
+}
 
 void FrozenGoblin::takeTurn(Player& player) {
-    // 设置意图：显示即将攻击
-    setIntent(EnemyIntent::ATTACK, getEffectiveAttack());
+    turnCounter++;
 
-    // 执行攻击
+    // 先处理累积的能量削弱
+    if (energyDebuffStacks > 0) {
+        int energyReduction = energyDebuffStacks;
+        player.maxEnergy = std::max(1, player.maxEnergy - energyReduction);
+        energyDebuffStacks = 0;
+    }
+
+    // 奇数回合：寒冰屏障
+    if (turnCounter % 2 == 1) {
+        setIntent(EnemyIntent::DEFEND, 20);
+
+        if (!isDisabled()) {
+            // 获得 20 点护盾
+            shield += 20;
+            if (onShieldChanged) onShieldChanged(shield, 20);
+        }
+    }
+    // 偶数回合：冰冻
+    else {
+        setIntent(EnemyIntent::BUFF, 1);
+
+        if (!isDisabled()) {
+            // 给玩家施加 1 回合虚弱
+            Status weaken;
+            weaken.type = StatusType::WEAKEN;
+            weaken.value = 3;
+            weaken.turnsRemaining = 1;
+            player.addStatus(weaken);
+
+            // 50% 概率施加 1 回合冰冻
+            if ((rand() % 100) < 50) {
+                Status freeze;
+                freeze.type = StatusType::FREEZE;
+                freeze.value = 1;
+                freeze.turnsRemaining = 1;
+                player.addStatus(freeze);
+            }
+        }
+    }
+
+    // 每回合都进行攻击
     if (!isDisabled()) {
         player.takeDamage(getEffectiveAttack(), DamageType::ICE);
     }
 }
 
-std::vector<std::string> FrozenGoblin::getDescription() const { return {"内心冰冷的程序猿，每回合造成 6 点物理伤害。"}; }
+void FrozenGoblin::takeDamage(int dmg, DamageType dtype) {
+    // 如果有护盾且受到攻击，记录能量削弱
+    if (shield > 0 && dmg > 0) {
+        energyDebuffStacks++;
+    }
+
+    // 调用基类的受伤逻辑
+    Enemy::takeDamage(dmg, dtype);
+}
+
+std::vector<std::string> FrozenGoblin::getDescription() const {
+    return {
+        "内心冰冷的程序猿，每回合造成 12 点冰属性伤害。",
+        "【寒冰屏障】奇数回合获得 20 点护盾",
+        "【冰冻】偶数回合使玩家获得 1 回合虚弱（攻击力-3），并有 50% 概率获得 1 回合冰冻状态"
+    };
+}
 
 void Caster::takeTurn(Player& player) {
     int actionChoice = rand() % 2;
@@ -205,12 +306,12 @@ void Caster::takeTurn(Player& player) {
                 addStatus(regen);
             }
         } else {
-            setIntent(EnemyIntent::BUFF, 2);
+            setIntent(EnemyIntent::BUFF, 4);
             if (!isDisabled()) {
                 Status strength;
                 strength.type = StatusType::STRENGTH;
-                strength.value = 2;
-                strength.turnsRemaining = 2;
+                strength.value = 4;
+                strength.turnsRemaining = -1;  // 永久
                 addStatus(strength);
             }
         }
@@ -223,7 +324,7 @@ std::vector<std::string> Caster::getDescription() const {
         "每回合有 0.5 的概率进行一次随机属性的攻击，造成 3 点基础伤害",
         "若不进行攻击，则会释放一次 ⌈魔法⌋：",
         "   - 如果己方有单位血量低于最大血量的 1/3，则释放回复魔法，为全体提供两回合的再生",
-        "   - 否则释放强化魔法，为己方全体增加两回合的力量"
+        "   - 否则释放强化魔法，为己方永久增加 4 点力量"
     };
 }
 
@@ -268,10 +369,10 @@ void TemplateKing::switchMode() {
 
 int TemplateKing::getShieldAmount() const {
     switch (currentPhase) {
-        case Phase::FIRST:  return 10;
-        case Phase::SECOND: return 15;
-        case Phase::THIRD:  return 20;
-        default:            return 10;
+        case Phase::FIRST:  return 50;
+        case Phase::SECOND: return 100;
+        case Phase::THIRD:  return 150;
+        default:            return 50;
     }
 }
 
@@ -286,7 +387,7 @@ void TemplateKing::attackMode(Player& player) {
         Status copyStrength;
         copyStrength.type = StatusType::STRENGTH;
         copyStrength.value = playerAtk / 2;  // 复制 50% 的玩家攻击力
-        copyStrength.turnsRemaining = 2;
+        copyStrength.turnsRemaining = -1;    // 永久
         addStatus(copyStrength);
 
         // 然后攻击

@@ -165,12 +165,8 @@ std::unique_ptr<Card> GameManager::createCardByName(const std::string& name) {
 
     // ---- 函数牌：防御类 ----
     if (name == "IronWallCard")         return std::make_unique<IronWallCard>();
-    if (name == "CounterDamageCard")    return std::make_unique<CounterDamageCard>();
-    if (name == "RegenerationCard")     return std::make_unique<RegenerationCard>();
     if (name == "DodgeCard")            return std::make_unique<DodgeCard>();
-    if (name == "ThornsCard")           return std::make_unique<ThornsCard>();
     if (name == "RageCard")             return std::make_unique<RageCard>();
-    if (name == "FortifyCard")          return std::make_unique<FortifyCard>();
 
     // ---- 函数牌：召唤/复制/移动/献祭/逃跑类 ----
     if (name == "EnhancedSummonCard")   return std::make_unique<EnhancedSummonCard>();
@@ -183,7 +179,6 @@ std::unique_ptr<Card> GameManager::createCardByName(const std::string& name) {
 
     // ---- 指令牌 ----
     if (name == "PowerStrikeCard")      return std::make_unique<PowerStrikeCard>();
-    if (name == "SweepCard")            return std::make_unique<SweepCard>();
     if (name == "DefendCard")           return std::make_unique<DefendCard>();
     if (name == "FortressCard")         return std::make_unique<FortressCard>();
     if (name == "EmergencyDodgeCard")   return std::make_unique<EmergencyDodgeCard>();
@@ -192,7 +187,6 @@ std::unique_ptr<Card> GameManager::createCardByName(const std::string& name) {
     if (name == "StrengthCard")         return std::make_unique<StrengthCard>();
     if (name == "SummonCard")           return std::make_unique<SummonCard>();
     if (name == "QuickCopyCard")        return std::make_unique<QuickCopyCard>();
-    if (name == "SacrificeCard")        return std::make_unique<SacrificeCard>();
     if (name == "BloodSacrificeCard")   return std::make_unique<BloodSacrificeCard>();
 
     return nullptr;
@@ -475,16 +469,16 @@ void GameManager::generateMap(int seed) {
 void GameManager::initCardCollection() {
     cardCollection.clear();
 
-    // 基础卡牌（共 13 张）
-    for (int i = 0; i < 3; ++i) cardCollection.push_back(std::make_unique<PowerStrikeCard>());
+    // 基础卡牌（共 15 张）
+    for (int i = 0; i < 3; ++i) cardCollection.push_back(std::make_unique<StrikeCard>());
     for (int i = 0; i < 3; ++i) cardCollection.push_back(std::make_unique<DefendCard>());
-    for (int i = 0; i < 2; ++i) cardCollection.push_back(std::make_unique<AttackEnhanceCard>());
+    cardCollection.push_back(std::make_unique<PowerStrikeCard>());
     for (int i = 0; i < 2; ++i) cardCollection.push_back(std::make_unique<HealCard>());
     for (int i = 0; i < 2; ++i) cardCollection.push_back(std::make_unique<StrengthCard>());
+    cardCollection.push_back(std::make_unique<AttackEnhanceCard>());
+    cardCollection.push_back(std::make_unique<VampireAttackCard>());
     cardCollection.push_back(std::make_unique<SummonCard>());
-    // 再加 2 张凑满 15
-    cardCollection.push_back(std::make_unique<PoisonAttackCard>());
-    cardCollection.push_back(std::make_unique<BurnAttackCard>());
+    cardCollection.push_back(std::make_unique<CritAttackCard>());
 }
 
 // ============================================================
@@ -605,6 +599,8 @@ void GameManager::prepareAttackCodeBlock() {
         cmd.lines = {QString("target = enemy[random()];"),
                      QString("target.takeDamage(%1, PHYSICAL);").arg(raw->getEffectiveAttack())};
         cmd.effect = [this, raw]() {
+            // 玩家已死亡，不再执行仆从行动
+            if (!player.isAlive()) return;
             // 确认仆从仍在存活列表中（可能已被其他效果击杀并移除）
             bool found = false;
             for (auto& m : player.minions) {
@@ -627,6 +623,8 @@ void GameManager::prepareAttackCodeBlock() {
         cmd.lines = buildEnemyCodeLines(e.get());
         cmd.source = CommandSource::ENEMY;
         cmd.effect = [this, raw = e.get()]() {
+            // 玩家已死亡，不再执行敌人行动
+            if (!player.isAlive()) return;
             // 确认敌人仍在存活列表中（可能已被其他效果击杀并移除）
             bool found = false;
             for (auto& ep : battle.enemies) {
@@ -678,6 +676,8 @@ void GameManager::prepareEndCodeBlock() {
         cmd.lines = {QString("%1.tickStatuses();").arg(cmd.title)};
         cmd.source = CommandSource::ENEMY;
         cmd.effect = [this, raw = e.get()]() {
+            // 玩家已死亡，不再执行敌人状态结算
+            if (!player.isAlive()) return;
             // 确认敌人仍在存活列表中（可能已被其他效果击杀并移除）
             bool found = false;
             for (auto& ep : battle.enemies) {
@@ -704,7 +704,7 @@ TurnResult GameManager::finishTurnAfterCodeExecution() {
 // ============================================================
 
 void GameManager::growMaxEnergy() {
-    player.maxEnergy = DEFAULT_MAX_ENERGY + turnNumber - 1;
+    player.maxEnergy = std::min(6, DEFAULT_MAX_ENERGY + turnNumber - 1);
 }
 
 void GameManager::restoreEnergy() {

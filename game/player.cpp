@@ -85,6 +85,8 @@ void Player::takeDamage(int dmg, DamageType type) {
     if (onDamageReceived && hp < oldHp) onDamageReceived(oldHp - hp, type);
     if (onHpChanged && hp != oldHp) onHpChanged(hp, maxHp, hp - oldHp);
     if (onShieldChanged && shield != oldShield) onShieldChanged(shield, shield - oldShield);
+    // 触发死亡回调（仅播放动画，不真正结束游戏）
+    if (!isAlive() && onDeath) onDeath();
 }
 
 Minion Player::summon() {
