@@ -693,6 +693,9 @@ void GameManager::prepareEndCodeBlock() {
 TurnResult GameManager::finishTurnAfterCodeExecution() {
     if (battle.onTurnEnd) battle.onTurnEnd(turnNumber);
 
+    // 回合结束后清理本回合死亡的敌人
+    battle.cleanupDeadEnemies();
+
     return {false, false};
 }
 
