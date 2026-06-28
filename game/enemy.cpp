@@ -138,6 +138,23 @@ std::vector<std::string> Enemy::getStatusesCode() const {
     return lines;
 }
 
+std::string Enemy::getEnemyIntent() const {
+    switch (nextIntent.type) {
+        case EnemyIntent::ATTACK:
+            return "攻击" + std::to_string(nextIntent.value);
+        case EnemyIntent::DEFEND:
+            return "防御" + std::to_string(nextIntent.value);
+        case EnemyIntent::HEAL:
+            return "回复" + std::to_string(nextIntent.value);
+        case EnemyIntent::BUFF:
+        case EnemyIntent::SUMMON:
+            return "增益";
+        case EnemyIntent::NONE:
+        default:
+            return "等待";
+    }
+}
+
 // ============================================================
 // Goblin 实现
 // ============================================================
@@ -153,6 +170,10 @@ void Goblin::takeTurn(Player& player) {
 }
 
 std::vector<std::string> Goblin::getDescription() const { return {"普通的程序猿，每回合造成 7 点物理伤害。"}; }
+
+std::string Goblin::getEnemyIntent() const {
+    return "攻击" + std::to_string(getEffectiveAttack());
+}
 
 void FireGoblin::takeTurn(Player& player) {
     turnCounter++;
@@ -210,6 +231,21 @@ std::vector<std::string> FireGoblin::getDescription() const {
         "【火焰屏障】奇数回合获得 10 点护盾，攻击有护盾的炽热程序猿会在其下回合受到 3 点火焰反伤",
         "【燃烧】偶数回合使玩家获得 3 回合灼烧状态（每回合 3 点伤害）"
     };
+}
+
+std::string FireGoblin::getEnemyIntent() const {
+    int nextTurn = turnCounter + 1;
+    std::string intent = "攻击" + std::to_string(getEffectiveAttack());
+
+    if (nextTurn % 2 == 1) {
+        // 奇数回合：防御
+        intent += " + 防御10";
+    } else {
+        // 偶数回合：增益（燃烧）
+        intent += " + 增益";
+    }
+
+    return intent;
 }
 
 void FrozenGoblin::takeTurn(Player& player) {
@@ -279,6 +315,21 @@ std::vector<std::string> FrozenGoblin::getDescription() const {
     };
 }
 
+std::string FrozenGoblin::getEnemyIntent() const {
+    int nextTurn = turnCounter + 1;
+    std::string intent = "攻击" + std::to_string(getEffectiveAttack());
+
+    if (nextTurn % 2 == 1) {
+        // 奇数回合：防御
+        intent += " + 防御20";
+    } else {
+        // 偶数回合：增益（虚弱 + 50%冰冻）
+        intent += " + 增益";
+    }
+
+    return intent;
+}
+
 void Caster::takeTurn(Player& player) {
     int actionChoice = rand() % 2;
     if (actionChoice == 0) {
@@ -328,6 +379,18 @@ std::vector<std::string> Caster::getDescription() const {
     };
 }
 
+std::string Caster::getEnemyIntent() const {
+    bool needsHealing = (hp < maxHp / 3);
+
+    if (needsHealing) {
+        // 血量低时必定回复
+        return "50% 攻击" + std::to_string(getEffectiveAttack()) + " + 50% 回复5";
+    } else {
+        // 血量正常时增益或攻击
+        return "50% 攻击" + std::to_string(getEffectiveAttack()) + " + 50% 增益";
+    }
+}
+
 // ============================================================
 // TemplateKing（模板魔王）实现
 // ============================================================
@@ -357,8 +420,8 @@ std::vector<std::string> TemplateKing::getDescription() const {
         "【多阶段机制】生命值降至 66% 和 33% 时进入新阶段，进入新阶段后恢复护盾",
         "【模式切换】每 3 回合在 ⌈攻击模式⌋ 和 ⌈防御模式⌋ 之间切换",
         "    -【攻击模式】复制玩家攻击力的 50% 作为两回合力量增益，然后进行一次基础伤害为 10 的攻击",
-        "    -【防御模式】每回合生成护盾，护盾量随阶段递增（一阶段 10 / 二阶段 15 / 三阶段 20），并回复少量生命值",
-        "【终结技】第三阶段时每 4 回合释放一次两倍攻击力的 AOE 攻击"
+        "    -【防御模式】每回合生成护盾，护盾量随阶段递增（一阶段 100 / 二阶段 150 / 三阶段 200），并回复少量生命值",
+        "【终结技】第三阶段时每 2 回合释放一次两倍攻击力的 AOE 攻击"
     };
 }
 
@@ -433,7 +496,7 @@ void TemplateKing::takeTurn(Player& player) {
     turnsSinceLastSwitch++;
 
     // 第三阶段每 4 回合释放终极技
-    if (currentPhase == Phase::THIRD && turnsInPhase % 4 == 0) {
+    if (currentPhase == Phase::THIRD && turnsInPhase % 2 == 0) {
         ultimateAttack(player);
         return;
     }
@@ -448,6 +511,27 @@ void TemplateKing::takeTurn(Player& player) {
         attackMode(player);
     } else {
         defenseMode(player);
+    }
+}
+
+std::string TemplateKing::getEnemyIntent() const {
+    // 检查下回合是否触发终极技
+    int nextTurnsInPhase = turnsInPhase + 1;
+    if (currentPhase == Phase::THIRD && nextTurnsInPhase % 2 == 0) {
+        return "攻击" + std::to_string(getEffectiveAttack() * 2);
+    }
+
+    // 检查是否即将切换模式
+    int nextTurnsSinceSwitch = turnsSinceLastSwitch + 1;
+    Mode nextMode = currentMode;
+    if (nextTurnsSinceSwitch >= 3) {
+        nextMode = (currentMode == Mode::ATTACK) ? Mode::DEFENSE : Mode::ATTACK;
+    }
+
+    if (nextMode == Mode::ATTACK) {
+        return "攻击" + std::to_string(getEffectiveAttack()) + " + 增益";
+    } else {
+        return "防御" + std::to_string(getShieldAmount());
     }
 }
 
@@ -608,4 +692,25 @@ void ExceptionLord::takeTurn(Player& player) {
         player.takeDamage(getEffectiveAttack(), DamageType::PHYSICAL);
         gainException(1);  // 主动攻击也会积累异常
     }
+}
+
+std::string ExceptionLord::getEnemyIntent() const {
+    int nextTurn = turnCounter + 1;
+
+    // 每 5 回合释放异常链
+    if (nextTurn % 5 == 0) {
+        int attackCount = exceptionCount > 0 ? exceptionCount : 1;
+        attackCount = attackCount > 5 ? 5 : attackCount;
+        return "攻击" + std::to_string(getEffectiveAttack() * attackCount);
+    }
+
+    // 异常计数 >= 3 时，60% 概率使用 Throw 攻击
+    if (exceptionCount >= 3) {
+        int throwDamage = getEffectiveAttack() * (1 + exceptionCount);
+        int normalDamage = getEffectiveAttack();
+        return "60% 攻击" + std::to_string(throwDamage) + " + 40% 攻击" + std::to_string(normalDamage);
+    }
+
+    // 普通攻击
+    return "攻击" + std::to_string(getEffectiveAttack());
 }
