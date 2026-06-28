@@ -94,6 +94,8 @@ private:
     QWidget* helpOverlay = nullptr;
     QWidget* mapOverlay = nullptr;
     QWidget* rewardOverlay = nullptr;
+    QWidget* seedOverlay = nullptr;
+    QWidget* startOverlay = nullptr;
 
     int activeCodeIndex = -1;
     int selectedEnemyIndex = -1;
@@ -114,8 +116,14 @@ private:
     void initResourceContrast();
     void initOverlays();
     void positionOverlays();
+    void positionTitleLabel();
     void resetRuntimeState();
     void startNewGame();
+    void beginNewGameWithSeed(int seed);
+    void showStartOverlay();
+    void hideStartOverlay();
+    void showSeedOverlay();
+    void hideSeedOverlay();
     void beginTurnWithoutAutoDraw();
     void startTurnDrawFive();
     void drawNextCard(int remainingCount);

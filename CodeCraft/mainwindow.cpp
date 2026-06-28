@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QFrame>
 #include <QLabel>
+#include <QLineEdit>
 #include <QSizePolicy>
 #include <QLayout>
 #include <QGraphicsDropShadowEffect>
@@ -15,6 +16,7 @@
 #include <QScrollArea>
 #include <QGridLayout>
 #include <QInputDialog>
+#include <QIntValidator>
 #include <QParallelAnimationGroup>
 #include <QSequentialAnimationGroup>
 #include <QMessageBox>
@@ -459,6 +461,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
         setScaledPixmap(ui->minionImageLabel2, kMinionPath);
     }
 
+    positionTitleLabel();
     positionEnemySlots();
     positionOverlays();
 }
@@ -468,6 +471,11 @@ void MainWindow::initOverlays()
     gameOverOverlay = nullptr;
     helpOverlay = nullptr;
     mapOverlay = nullptr;
+    rewardOverlay = nullptr;
+    seedOverlay = nullptr;
+    startOverlay = nullptr;
+
+    positionTitleLabel();
 }
 
 void MainWindow::positionOverlays()
@@ -478,7 +486,40 @@ void MainWindow::positionOverlays()
 
     const QRect rect = ui->centralwidget->rect();
 
+    positionTitleLabel();
     positionEnemySlots();
+
+    if (startOverlay) {
+        startOverlay->setGeometry(rect);
+        if (auto* bg = startOverlay->findChild<QLabel*>(QStringLiteral("startBgLabel"))) {
+            bg->setGeometry(startOverlay->rect());
+            setScaledPixmap(bg, kBattleBgPath, Qt::IgnoreAspectRatio);
+            bg->lower();
+        }
+        if (auto* shade = startOverlay->findChild<QWidget*>(QStringLiteral("startShade"))) {
+            shade->setGeometry(startOverlay->rect());
+            shade->lower();
+            if (auto* bg = startOverlay->findChild<QLabel*>(QStringLiteral("startBgLabel"))) {
+                bg->lower();
+            }
+        }
+    }
+
+    if (seedOverlay) {
+        seedOverlay->setGeometry(rect);
+        if (auto* bg = seedOverlay->findChild<QLabel*>(QStringLiteral("seedBgLabel"))) {
+            bg->setGeometry(seedOverlay->rect());
+            setScaledPixmap(bg, kBattleBgPath, Qt::IgnoreAspectRatio);
+            bg->lower();
+        }
+        if (auto* shade = seedOverlay->findChild<QWidget*>(QStringLiteral("seedShade"))) {
+            shade->setGeometry(seedOverlay->rect());
+            shade->lower();
+            if (auto* bg = seedOverlay->findChild<QLabel*>(QStringLiteral("seedBgLabel"))) {
+                bg->lower();
+            }
+        }
+    }
 
     if (gameOverOverlay) {
         gameOverOverlay->setGeometry(rect);
@@ -496,6 +537,20 @@ void MainWindow::positionOverlays()
         rewardOverlay->setGeometry(rect);
     }
 }
+
+void MainWindow::positionTitleLabel()
+{
+    if (!ui || !ui->centralwidget || !ui->titleLabel) {
+        return;
+    }
+
+    const int w = ui->centralwidget->width();
+    const int titleW = 240;
+    ui->titleLabel->setGeometry((w - titleW) / 2, 4, titleW, 28);
+    ui->titleLabel->setAlignment(Qt::AlignCenter);
+    ui->titleLabel->raise();
+}
+
 
 // ============================================================
 // 初始化
@@ -558,6 +613,15 @@ void MainWindow::initTheme()
         "color: #D7F7FF;"
         "font-family: 'Microsoft YaHei UI', 'Segoe UI';"
         "font-size: 13px;"
+        "}"
+        "QLabel#titleLabel {"
+        "background: transparent;"
+        "border: none;"
+        "color: #E9FBFF;"
+        "font-size: 15px;"
+        "font-weight: 900;"
+        "letter-spacing: 1px;"
+        "padding: 0px;"
         "}"
         "QLabel#playerHpLabel, QLabel#playerEnergyLabel, QLabel#playerShieldLabel, "
         "QLabel#playerStrengthLabel, QLabel#enemyHpLabel, QLabel#enemyIntentLabel, "
@@ -829,6 +893,8 @@ void MainWindow::resetRuntimeState()
     hideHelpOverlay();
     hideMapOverlay();
     hideRewardOverlay();
+    hideSeedOverlay();
+    hideStartOverlay();
 
     ++executionToken;
     ++sideHighlightToken;
@@ -875,39 +941,33 @@ void MainWindow::startNewGame()
 {
     resetRuntimeState();
 
-    // 一局游戏开始前，玩家必须先输入 seed。
-    // seed 交给 GameManager::generateMap(seed)，由 GameManager 生成 DAG 地图。
     gameManager.reset();
     GameManager::resetPlayerState();
     GameManager::initCardCollection();
 
-    const int defaultSeed = static_cast<int>(QRandomGenerator::global()->bounded(1, 1000000));
-    bool ok = false;
+    clearLogs();
+    clearCodeHighlight();
+    clearSideChangeHighlight();
+    appendLog(QStringLiteral("主菜单。"));
 
-    const int seed = QInputDialog::getInt(
-        this,
-        QStringLiteral("输入地图 Seed"),
-        QStringLiteral("请输入整数 seed，用于生成本局 DAG 地图："),
-        defaultSeed,
-        1,
-        999999999,
-        1,
-        &ok
-    );
+    setControlsEnabled(false);
+    ui->endTurnButton->setEnabled(false);
+    ui->restartButton->setEnabled(true);
+    ui->helpButton->setEnabled(true);
 
-    if (!ok) {
-        clearLogs();
-        clearCodeHighlight();
-        clearSideChangeHighlight();
-        appendLog(QStringLiteral("已取消输入 seed。本局尚未开始，点击“重新开始”可重新输入 seed。"));
+    QTimer::singleShot(0, this, [this]() {
+        showStartOverlay();
+    });
+}
 
-        setControlsEnabled(false);
-        ui->endTurnButton->setEnabled(false);
-        ui->restartButton->setEnabled(true);
-        ui->helpButton->setEnabled(true);
-        return;
-    }
+void MainWindow::beginNewGameWithSeed(int seed)
+{
+    hideSeedOverlay();
+    hideStartOverlay();
 
+    gameManager.reset();
+    GameManager::resetPlayerState();
+    GameManager::initCardCollection();
     GameManager::generateMap(seed);
 
     clearLogs();
@@ -915,19 +975,388 @@ void MainWindow::startNewGame()
     clearSideChangeHighlight();
     appendLog(QString("新的 DAG 地图已生成，seed = %1。请先在地图中选择一个战斗节点。").arg(seed));
 
-    // 地图阶段不允许出牌/结束回合，但允许重新开始和查看规则。
     setControlsEnabled(false);
     ui->endTurnButton->setEnabled(false);
     ui->restartButton->setEnabled(true);
     ui->helpButton->setEnabled(true);
 
-    // 输入 seed 并生成地图后，再显示地图覆盖层。
     QTimer::singleShot(0, this, [this]() {
         if (!gameManager && GameManager::hasMap()) {
             showMapOverlay();
         }
     });
 }
+
+void MainWindow::showStartOverlay()
+{
+    hideStartOverlay();
+
+    if (!ui || !ui->centralwidget) {
+        return;
+    }
+
+    startOverlay = new QWidget(ui->centralwidget);
+    startOverlay->setObjectName("startOverlay");
+    startOverlay->setAttribute(Qt::WA_StyledBackground, true);
+    startOverlay->setGeometry(ui->centralwidget->rect());
+    startOverlay->setStyleSheet(
+        "QWidget#startOverlay {"
+        "background-color: #03070D;"
+        "}"
+        "QWidget#startShade {"
+        "background-color: rgba(0, 0, 0, 150);"
+        "}"
+        "QWidget#startCard {"
+        "background-color: rgba(4, 9, 18, 242);"
+        "border: 2px solid rgba(105, 225, 255, 215);"
+        "border-radius: 22px;"
+        "}"
+        "QLabel#gameTitleLabel {"
+        "color: #F8FEFF;"
+        "font-size: 46px;"
+        "font-weight: 900;"
+        "letter-spacing: 5px;"
+        "}"
+        "QLabel#gameSubTitleLabel {"
+        "color: #9BEFFF;"
+        "font-size: 16px;"
+        "font-weight: 800;"
+        "}"
+        "QLabel#gameSloganLabel {"
+        "color: #E5FBFF;"
+        "font-size: 14px;"
+        "font-weight: 700;"
+        "}"
+        "QPushButton#startPrimaryButton {"
+        "background-color: rgba(10, 52, 78, 238);"
+        "color: #F7FEFF;"
+        "border: 2px solid rgba(105, 235, 255, 230);"
+        "border-radius: 12px;"
+        "padding: 12px 34px;"
+        "font-size: 17px;"
+        "font-weight: 900;"
+        "}"
+        "QPushButton#startPrimaryButton:hover {"
+        "background-color: rgba(21, 86, 116, 245);"
+        "border: 2px solid #FFFFFF;"
+        "}"
+        "QPushButton#startSecondaryButton {"
+        "background-color: rgba(12, 18, 30, 225);"
+        "color: #C8F3FF;"
+        "border: 1px solid rgba(105, 235, 255, 165);"
+        "border-radius: 12px;"
+        "padding: 10px 28px;"
+        "font-size: 15px;"
+        "font-weight: 850;"
+        "}"
+        "QPushButton#startSecondaryButton:hover {"
+        "background-color: rgba(28, 55, 78, 235);"
+        "color: #FFFFFF;"
+        "border: 1px solid #FFFFFF;"
+        "}"
+    );
+
+    auto* bg = new QLabel(startOverlay);
+    bg->setObjectName("startBgLabel");
+    bg->setGeometry(startOverlay->rect());
+    bg->setScaledContents(true);
+    setScaledPixmap(bg, kBattleBgPath, Qt::IgnoreAspectRatio);
+    auto* bgEffect = new QGraphicsOpacityEffect(bg);
+    bgEffect->setOpacity(0.42);
+    bg->setGraphicsEffect(bgEffect);
+    bg->lower();
+
+    auto* shade = new QWidget(startOverlay);
+    shade->setObjectName("startShade");
+    shade->setGeometry(startOverlay->rect());
+    shade->lower();
+    bg->lower();
+
+    auto* outer = new QVBoxLayout(startOverlay);
+    outer->setContentsMargins(90, 80, 90, 80);
+    outer->addStretch();
+
+    auto* card = new QWidget(startOverlay);
+    card->setObjectName("startCard");
+    card->setMaximumWidth(860);
+
+    auto* cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(58, 48, 58, 48);
+    cardLayout->setSpacing(20);
+
+    auto* title = new QLabel(QStringLiteral("CODECRAFT"), card);
+    title->setObjectName("gameTitleLabel");
+    title->setAlignment(Qt::AlignCenter);
+
+    auto* subtitle = new QLabel(QStringLiteral("函数即卡牌，对象即棋子，调用即出牌"), card);
+    subtitle->setObjectName("gameSubTitleLabel");
+    subtitle->setAlignment(Qt::AlignCenter);
+
+    auto* slogan = new QLabel(QStringLiteral("构建执行队列，改写函数行为，在暗黑代码遗迹中击败最终 Boss。"), card);
+    slogan->setObjectName("gameSloganLabel");
+    slogan->setAlignment(Qt::AlignCenter);
+    slogan->setWordWrap(true);
+
+    auto* startButton = new QPushButton(QStringLiteral("开始新游戏"), card);
+    startButton->setObjectName("startPrimaryButton");
+    startButton->setMinimumWidth(240);
+
+    auto* quickButton = new QPushButton(QStringLiteral("随机开始"), card);
+    quickButton->setObjectName("startSecondaryButton");
+    quickButton->setMinimumWidth(180);
+
+    auto* helpButton = new QPushButton(QStringLiteral("游戏说明"), card);
+    helpButton->setObjectName("startSecondaryButton");
+    helpButton->setMinimumWidth(180);
+
+    auto* buttonRow = new QHBoxLayout();
+    buttonRow->setSpacing(16);
+    buttonRow->addStretch();
+    buttonRow->addWidget(quickButton);
+    buttonRow->addWidget(helpButton);
+    buttonRow->addStretch();
+
+    cardLayout->addWidget(title);
+    cardLayout->addWidget(subtitle);
+    cardLayout->addWidget(slogan);
+    cardLayout->addSpacing(12);
+    cardLayout->addWidget(startButton, 0, Qt::AlignCenter);
+    cardLayout->addLayout(buttonRow);
+
+    outer->addWidget(card, 0, Qt::AlignCenter);
+    outer->addStretch();
+
+    connect(startButton, &QPushButton::clicked, this, [this]() {
+        hideStartOverlay();
+        showSeedOverlay();
+    });
+
+    connect(quickButton, &QPushButton::clicked, this, [this]() {
+        const int seed = static_cast<int>(QRandomGenerator::global()->bounded(1, 1000000));
+        beginNewGameWithSeed(seed);
+    });
+
+    connect(helpButton, &QPushButton::clicked, this, [this]() {
+        showHelpOverlay();
+    });
+
+    card->raise();
+    startOverlay->show();
+    startOverlay->raise();
+}
+
+void MainWindow::hideStartOverlay()
+{
+    if (!startOverlay) {
+        return;
+    }
+
+    QWidget* overlay = startOverlay;
+    startOverlay = nullptr;
+    overlay->hide();
+    overlay->deleteLater();
+}
+
+
+void MainWindow::showSeedOverlay()
+{
+    hideSeedOverlay();
+    hideStartOverlay();
+
+    if (!ui || !ui->centralwidget) {
+        return;
+    }
+
+    seedOverlay = new QWidget(ui->centralwidget);
+    seedOverlay->setObjectName("seedOverlay");
+    seedOverlay->setAttribute(Qt::WA_StyledBackground, true);
+    seedOverlay->setGeometry(ui->centralwidget->rect());
+    seedOverlay->setStyleSheet(
+        "QWidget#seedOverlay {"
+        "background-color: #03070D;"
+        "}"
+        "QWidget#seedShade {"
+        "background-color: rgba(0, 0, 0, 150);"
+        "}"
+        "QWidget#seedCard {"
+        "background-color: rgba(4, 9, 18, 242);"
+        "border: 2px solid rgba(105, 225, 255, 215);"
+        "border-radius: 18px;"
+        "}"
+        "QLabel#seedTitleLabel {"
+        "color: #F4FEFF;"
+        "font-size: 30px;"
+        "font-weight: 900;"
+        "letter-spacing: 2px;"
+        "}"
+        "QLabel#seedSubTitleLabel {"
+        "color: #A9EFFF;"
+        "font-size: 14px;"
+        "font-weight: 700;"
+        "}"
+        "QLineEdit#seedLineEdit {"
+        "background-color: rgba(5, 14, 26, 235);"
+        "color: #F7FEFF;"
+        "border: 2px solid rgba(105, 235, 255, 205);"
+        "border-radius: 12px;"
+        "padding: 4px 16px;"
+        "font-size: 20px;"
+        "font-weight: 850;"
+        "selection-background-color: #69EBFF;"
+        "selection-color: #061018;"
+        "}"
+        "QPushButton#seedPrimaryButton {"
+        "background-color: rgba(10, 52, 78, 235);"
+        "color: #F7FEFF;"
+        "border: 2px solid rgba(105, 235, 255, 230);"
+        "border-radius: 11px;"
+        "padding: 10px 24px;"
+        "font-size: 15px;"
+        "font-weight: 900;"
+        "}"
+        "QPushButton#seedPrimaryButton:hover {"
+        "background-color: rgba(21, 86, 116, 245);"
+        "border: 2px solid #FFFFFF;"
+        "}"
+        "QPushButton#seedSecondaryButton {"
+        "background-color: rgba(12, 18, 30, 225);"
+        "color: #BDEFFF;"
+        "border: 1px solid rgba(105, 235, 255, 165);"
+        "border-radius: 11px;"
+        "padding: 10px 20px;"
+        "font-size: 14px;"
+        "font-weight: 800;"
+        "}"
+        "QPushButton#seedSecondaryButton:hover {"
+        "background-color: rgba(28, 55, 78, 235);"
+        "color: #FFFFFF;"
+        "}"
+    );
+
+    auto* bg = new QLabel(seedOverlay);
+    bg->setObjectName("seedBgLabel");
+    bg->setGeometry(seedOverlay->rect());
+    bg->setScaledContents(true);
+    setScaledPixmap(bg, kBattleBgPath, Qt::IgnoreAspectRatio);
+    auto* bgEffect = new QGraphicsOpacityEffect(bg);
+    bgEffect->setOpacity(0.42);
+    bg->setGraphicsEffect(bgEffect);
+    bg->lower();
+
+    auto* shade = new QWidget(seedOverlay);
+    shade->setObjectName("seedShade");
+    shade->setGeometry(seedOverlay->rect());
+    shade->lower();
+    bg->lower();
+
+    auto* outer = new QVBoxLayout(seedOverlay);
+    outer->setContentsMargins(90, 90, 90, 90);
+    outer->addStretch();
+
+    auto* card = new QWidget(seedOverlay);
+    card->setObjectName("seedCard");
+    card->setMaximumWidth(760);
+
+    auto* cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(42, 34, 42, 34);
+    cardLayout->setSpacing(18);
+
+    auto* title = new QLabel(QStringLiteral("INITIALIZE RUN"), card);
+    title->setObjectName("seedTitleLabel");
+    title->setAlignment(Qt::AlignCenter);
+
+    auto* subtitle = new QLabel(QStringLiteral("输入整数 seed，生成本局 DAG 地图。相同 seed 会生成相同路线。"), card);
+    subtitle->setObjectName("seedSubTitleLabel");
+    subtitle->setAlignment(Qt::AlignCenter);
+    subtitle->setWordWrap(true);
+
+    auto* input = new QLineEdit(card);
+    input->setObjectName("seedLineEdit");
+    input->setAlignment(Qt::AlignCenter);
+    input->setValidator(new QIntValidator(1, 999999999, input));
+    input->setMinimumHeight(58);
+    input->setMinimumWidth(500);
+    input->setMaximumWidth(560);
+
+    const int defaultSeed = static_cast<int>(QRandomGenerator::global()->bounded(1, 1000000));
+    input->setText(QString::number(defaultSeed));
+    input->selectAll();
+
+    auto* buttonRow = new QHBoxLayout();
+    buttonRow->setSpacing(14);
+
+    auto* backButton = new QPushButton(QStringLiteral("返回主菜单"), card);
+    backButton->setObjectName("seedSecondaryButton");
+
+    auto* randomButton = new QPushButton(QStringLiteral("随机 seed"), card);
+    randomButton->setObjectName("seedSecondaryButton");
+
+    auto* startButton = new QPushButton(QStringLiteral("生成地图"), card);
+    startButton->setObjectName("seedPrimaryButton");
+
+    buttonRow->addStretch();
+    buttonRow->addWidget(backButton);
+    buttonRow->addWidget(randomButton);
+    buttonRow->addWidget(startButton);
+    buttonRow->addStretch();
+
+    auto* hint = new QLabel(QStringLiteral("提示：这是本局路线的初始化参数。之后会进入地图选择界面。"), card);
+    hint->setObjectName("seedSubTitleLabel");
+    hint->setAlignment(Qt::AlignCenter);
+    hint->setWordWrap(true);
+
+    cardLayout->addWidget(title);
+    cardLayout->addWidget(subtitle);
+    cardLayout->addWidget(input, 0, Qt::AlignCenter);
+    cardLayout->addLayout(buttonRow);
+    cardLayout->addWidget(hint);
+
+    outer->addWidget(card, 0, Qt::AlignCenter);
+    outer->addStretch();
+
+    connect(backButton, &QPushButton::clicked, this, [this]() {
+        hideSeedOverlay();
+        showStartOverlay();
+    });
+
+    connect(randomButton, &QPushButton::clicked, this, [input]() {
+        const int seed = static_cast<int>(QRandomGenerator::global()->bounded(1, 1000000));
+        input->setText(QString::number(seed));
+        input->selectAll();
+    });
+
+    auto startWithInput = [this, input]() {
+        bool ok = false;
+        const int seed = input->text().toInt(&ok);
+        if (!ok || seed <= 0) {
+            input->setFocus();
+            input->selectAll();
+            return;
+        }
+        beginNewGameWithSeed(seed);
+    };
+
+    connect(startButton, &QPushButton::clicked, this, startWithInput);
+    connect(input, &QLineEdit::returnPressed, this, startWithInput);
+
+    card->raise();
+    seedOverlay->show();
+    seedOverlay->raise();
+    input->setFocus();
+}
+
+void MainWindow::hideSeedOverlay()
+{
+    if (!seedOverlay) {
+        return;
+    }
+
+    QWidget* overlay = seedOverlay;
+    seedOverlay = nullptr;
+    overlay->hide();
+    overlay->deleteLater();
+}
+
 
 
 // ============================================================
@@ -1639,7 +2068,8 @@ void MainWindow::showMapOverlay()
     }
 
     if (!GameManager::hasMap()) {
-        GameManager::generateMap(static_cast<int>(QRandomGenerator::global()->bounded(1, 1000000)));
+        showSeedOverlay();
+        return;
     }
 
     mapOverlay = new QWidget(ui->centralwidget);
@@ -2435,36 +2865,63 @@ void MainWindow::positionEnemySlots()
         return;
     }
 
-    QRect base;
-    if (ui->enemyImageLabel) {
-        base = geometryInCentral(ui->enemyImageLabel);
-    }
-    if (!base.isValid() || base.width() <= 0 || base.height() <= 0) {
-        base = QRect(ui->centralwidget->width() * 58 / 100,
-                     ui->centralwidget->height() * 16 / 100,
-                     ui->centralwidget->width() * 30 / 100,
-                     ui->centralwidget->height() * 36 / 100);
-    }
-
+    const int cw = ui->centralwidget->width();
+    const int ch = ui->centralwidget->height();
     const int n = enemySlots.size();
 
-    // 多怪版本不要做成大卡牌：整体宽度收窄，单个怪更接近“立绘 + 光晕”。
-    const int gap = 24;
-    const int maxTotalWidth = qBound(280, ui->centralwidget->width() * 34 / 100, 560);
-    int slotW = (maxTotalWidth - gap * (n - 1)) / qMax(1, n);
-    slotW = qBound(105, slotW, 172);
-
-    int slotH = qBound(155, base.height() * 72 / 100, 232);
-    if (n >= 3) {
-        slotH = qMin(slotH, 205);
+    QRect playerRect;
+    if (ui->playerImageLabel) {
+        playerRect = geometryInCentral(ui->playerImageLabel);
     }
 
-    const int totalW = slotW * n + gap * (n - 1);
-    int x0 = base.center().x() - totalW / 2;
-    x0 = qBound(8, x0, qMax(8, ui->centralwidget->width() - totalW - 8));
+    QRect enemyCodeRect;
+    if (ui->enemyTickCodePlainTextEdit) {
+        enemyCodeRect = geometryInCentral(ui->enemyTickCodePlainTextEdit);
+    }
 
-    int y = base.y() + qMax(0, base.height() / 14);
-    y = qBound(8, y, qMax(8, ui->centralwidget->height() - slotH - 128));
+    int leftLimit = playerRect.isValid() && playerRect.width() > 0
+                        ? playerRect.right() + 70
+                        : cw * 43 / 100;
+    int rightLimit = enemyCodeRect.isValid() && enemyCodeRect.width() > 0
+                         ? enemyCodeRect.left() - 34
+                         : cw * 78 / 100;
+
+    // 防止窗口缩放或 ui 锚点异常导致怪物挤到边缘。
+    if (rightLimit - leftLimit < 260) {
+        leftLimit = cw * 46 / 100;
+        rightLimit = cw * 76 / 100;
+    }
+
+    leftLimit = qBound(cw * 38 / 100, leftLimit, cw * 62 / 100);
+    rightLimit = qBound(leftLimit + 260, rightLimit, cw * 82 / 100);
+
+    int slotW = 150;
+    int slotH = 206;
+    int gap = 38;
+
+    if (n == 1) {
+        slotW = 168;
+        slotH = 215;
+        gap = 0;
+    } else if (n == 2) {
+        slotW = 146;
+        slotH = 205;
+        gap = 46;
+    } else {
+        slotW = 126;
+        slotH = 192;
+        gap = 30;
+    }
+
+    const int totalW = slotW * n + gap * qMax(0, n - 1);
+    const int stageCenter = leftLimit + (rightLimit - leftLimit) / 2;
+    int x0 = stageCenter - totalW / 2;
+    x0 = qBound(8, x0, qMax(8, cw - totalW - 8));
+
+    int y = playerRect.isValid() && playerRect.height() > 0
+                ? playerRect.top() + playerRect.height() / 9
+                : ch * 43 / 100;
+    y = qBound(ch * 28 / 100, y, qMax(8, ch - slotH - 150));
 
     for (int i = 0; i < enemySlots.size(); ++i) {
         if (enemySlots[i].root) {
