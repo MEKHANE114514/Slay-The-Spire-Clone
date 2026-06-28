@@ -72,12 +72,15 @@ public:
     std::function<void(StatusType)>          onStatusRemoved;  // Buff/Debuff 消失
     std::function<void()>                    onDeath;          // 死亡 → 消失动画
     std::function<void(const EnemyIntent&)>  onIntentChanged;  // 意图切换 → UI 更新图标
-    
+
     // ---- 敌人描述 ----
     virtual std::vector<std::string> getDescription() const { return {"None"}; }
 
     // ---- 状态描述 ----
     std::vector<std::string> getStatusesCode() const;
+
+    // ---- 意图描述 ----
+    virtual std::string getEnemyIntent() const;
 
 protected:
     // 子类在 takeTurn() 中调用，设置本回合意图
@@ -97,6 +100,7 @@ public:
     Goblin() : Enemy("程序猿", 40, 7) {}
     void takeTurn(Player& player) override;
     std::vector<std::string> getDescription() const override;
+    std::string getEnemyIntent() const override;
 };
 
 // ============================================================
@@ -112,6 +116,7 @@ public:
     void takeTurn(Player& player) override;
     void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL) override;
     std::vector<std::string> getDescription() const override;
+    std::string getEnemyIntent() const override;
 private:
     int turnCounter = 0;
     int reflectDamageStacks = 0;  // 累积的反伤次数
@@ -130,6 +135,7 @@ public:
     void takeTurn(Player& player) override;
     void takeDamage(int dmg, DamageType type = DamageType::PHYSICAL) override;
     std::vector<std::string> getDescription() const override;
+    std::string getEnemyIntent() const override;
 private:
     int turnCounter = 0;
     int energyDebuffStacks = 0;  // 累积的能量削弱次数
@@ -149,6 +155,7 @@ public:
     Caster() : Enemy("魔法师", 200, 3) {}
     void takeTurn(Player& player) override;
     std::vector<std::string> getDescription() const override;
+    std::string getEnemyIntent() const override;
 };
 
 // ============================================================
@@ -176,6 +183,7 @@ public:
 
     void takeTurn(Player& player) override;
     std::vector<std::string> getDescription() const override;
+    std::string getEnemyIntent() const override;
 
 private:
     Phase currentPhase;
@@ -224,6 +232,9 @@ public:
 
     // 获取描述
     std::vector<std::string> getDescription() const override;
+
+    // 获取意图
+    std::string getEnemyIntent() const override;
 
     // 公开访问器用于测试和 UI 显示
     int getExceptionCount() const { return exceptionCount; }
