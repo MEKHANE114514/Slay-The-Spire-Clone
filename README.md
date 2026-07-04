@@ -4,7 +4,7 @@
 >
 > **核心创意**：以《杀戮尖塔》(Slay the Spire) 为灵感，将 C++ 面向对象语法与卡牌对战深度融合 —— **每一张牌都是一段 C++ 代码，每一次出牌都是一次函数调用。**
 >
-> 北大网盘链接：[https://disk.pku.edu.cn/anyshare/zh-cn/dir/FA0388D8FA494656BFC2A220A103A661/7B56E38A0A2C4A71BC2BC01286DAADBF](https://disk.pku.edu.cn/link/AA58BA4E74640143CC87F0A2F16AE56CD3
+> 网盘链接 ： https://disk.pku.edu.cn/link/AA58BA4E74640143CC87F0A2F16AE56CD3
 >
 > 该 README 中部分功能因为一些原因与实际不符或未实现，请以实际程序为准
 
